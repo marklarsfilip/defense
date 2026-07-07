@@ -20,6 +20,20 @@ const victoryResult: CombatResult = {
   events: [],
 };
 
+const chestReward = {
+  seed: 123,
+  levelId: starterLevel.id,
+  goldBonus: 7,
+  item: {
+    id: "item-1",
+    name: "Rare Test Axe",
+    rarity: "rare" as const,
+    slot: "weapon" as const,
+    itemLevel: 1,
+    modifiers: [{ stat: "damage" as const, label: "Brutal: +3 damage", amount: 3 }],
+  },
+};
+
 describe("progression", () => {
   it("applies victory rewards and records completed levels", () => {
     const campaign = applyCombatRewards(createInitialCampaign(), victoryResult);
@@ -36,6 +50,14 @@ describe("progression", () => {
     expect(getExperienceForNextLevel(1)).toBe(100);
     expect(campaign.heroLevel).toBe(2);
     expect(campaign.experience).toBe(50);
+  });
+
+  it("banks chest gold and inventory on victory", () => {
+    const campaign = applyCombatRewards(createInitialCampaign(), victoryResult, chestReward);
+
+    expect(campaign.gold).toBe(97);
+    expect(campaign.chestsOpened).toBe(1);
+    expect(campaign.inventory).toEqual([chestReward.item]);
   });
 
   it("does not apply rewards for defeats", () => {

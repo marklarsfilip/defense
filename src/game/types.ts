@@ -2,6 +2,12 @@ export type HeroClassId = "berserker" | "arcanist" | "ranger" | "summoner" | "gu
 
 export type DamageKind = "melee" | "magic" | "ranged" | "summon";
 
+export type LootRarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | "set";
+
+export type EquipmentSlot = "weapon" | "armor" | "trinket";
+
+export type StatKey = keyof Stats;
+
 export interface Stats {
   health: number;
   armor: number;
@@ -55,9 +61,75 @@ export interface LevelDefinition {
   id: string;
   name: string;
   subtitle: string;
+  levelNumber: number;
   enemyWaves: EnemySpawn[];
   durationLimit: number;
   seed: number;
+  chest: LevelChestDefinition;
+}
+
+export interface LevelChestDefinition {
+  itemLevel: number;
+  rarityWeights: Record<LootRarity, number>;
+  goldBonus: {
+    min: number;
+    max: number;
+  };
+}
+
+export interface LootRarityDefinition {
+  rarity: LootRarity;
+  label: string;
+  color: string;
+  powerMultiplier: number;
+  modifierCount: number;
+}
+
+export interface LootBaseItemDefinition {
+  id: string;
+  name: string;
+  slot: EquipmentSlot;
+}
+
+export interface LootAffixDefinition {
+  id: string;
+  name: string;
+  stat: StatKey;
+  minPerLevel: number;
+  maxPerLevel: number;
+}
+
+export interface LootSetDefinition {
+  id: string;
+  name: string;
+  pieces: Array<{
+    name: string;
+    slot: EquipmentSlot;
+  }>;
+}
+
+export interface LootModifier {
+  stat: StatKey;
+  label: string;
+  amount: number;
+}
+
+export interface LootItem {
+  id: string;
+  name: string;
+  rarity: LootRarity;
+  slot: EquipmentSlot;
+  itemLevel: number;
+  modifiers: LootModifier[];
+  setId?: string;
+  setName?: string;
+}
+
+export interface ChestReward {
+  seed: number;
+  levelId: string;
+  goldBonus: number;
+  item: LootItem;
 }
 
 export interface CombatEnemy {
@@ -135,4 +207,3 @@ export interface CombatResult {
   gold: number;
   events: CombatEvent[];
 }
-

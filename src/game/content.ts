@@ -1,4 +1,13 @@
-import type { EnemyDefinition, HeroClass, LevelDefinition } from "./types";
+import type {
+  EnemyDefinition,
+  HeroClass,
+  LevelDefinition,
+  LootAffixDefinition,
+  LootBaseItemDefinition,
+  LootRarity,
+  LootRarityDefinition,
+  LootSetDefinition,
+} from "./types";
 
 export const heroClasses: HeroClass[] = [
   {
@@ -147,12 +156,104 @@ export const enemies: Record<string, EnemyDefinition> = {
   },
 };
 
+export const lootRarities: Record<LootRarity, LootRarityDefinition> = {
+  common: {
+    rarity: "common",
+    label: "Common",
+    color: "#cbd5e1",
+    powerMultiplier: 1,
+    modifierCount: 1,
+  },
+  uncommon: {
+    rarity: "uncommon",
+    label: "Uncommon",
+    color: "#4ade80",
+    powerMultiplier: 1.22,
+    modifierCount: 1,
+  },
+  rare: {
+    rarity: "rare",
+    label: "Rare",
+    color: "#38bdf8",
+    powerMultiplier: 1.55,
+    modifierCount: 2,
+  },
+  epic: {
+    rarity: "epic",
+    label: "Epic",
+    color: "#c084fc",
+    powerMultiplier: 2,
+    modifierCount: 3,
+  },
+  legendary: {
+    rarity: "legendary",
+    label: "Legendary",
+    color: "#f59e0b",
+    powerMultiplier: 2.8,
+    modifierCount: 4,
+  },
+  set: {
+    rarity: "set",
+    label: "Set",
+    color: "#2dd4bf",
+    powerMultiplier: 2.35,
+    modifierCount: 3,
+  },
+};
+
+export const lootBaseItems: LootBaseItemDefinition[] = [
+  { id: "notched-axe", name: "Notched Axe", slot: "weapon" },
+  { id: "ashwood-staff", name: "Ashwood Staff", slot: "weapon" },
+  { id: "patched-mail", name: "Patched Mail", slot: "armor" },
+  { id: "bone-charm", name: "Bone Charm", slot: "trinket" },
+  { id: "gate-ring", name: "Gate Ring", slot: "trinket" },
+];
+
+export const lootAffixes: LootAffixDefinition[] = [
+  { id: "brutal", name: "Brutal", stat: "damage", minPerLevel: 1.7, maxPerLevel: 3.4 },
+  { id: "sturdy", name: "Sturdy", stat: "health", minPerLevel: 7, maxPerLevel: 14 },
+  { id: "guarded", name: "Guarded", stat: "armor", minPerLevel: 0.8, maxPerLevel: 1.8 },
+  { id: "quick", name: "Quick", stat: "attackSpeed", minPerLevel: 0.015, maxPerLevel: 0.035 },
+  { id: "precise", name: "Precise", stat: "critChance", minPerLevel: 0.01, maxPerLevel: 0.025 },
+  { id: "forceful", name: "Forceful", stat: "critDamage", minPerLevel: 0.03, maxPerLevel: 0.07 },
+  { id: "charged", name: "Charged", stat: "abilityPower", minPerLevel: 1.4, maxPerLevel: 3.2 },
+  { id: "focused", name: "Focused", stat: "cooldownReduction", minPerLevel: 0.006, maxPerLevel: 0.016 },
+];
+
+export const lootSets: LootSetDefinition[] = [
+  {
+    id: "bone-gate",
+    name: "Bone Gate Regalia",
+    pieces: [
+      { name: "Gatekeeper Splitter", slot: "weapon" },
+      { name: "Ribguard Harness", slot: "armor" },
+      { name: "Marrow Signet", slot: "trinket" },
+    ],
+  },
+];
+
 export const starterLevel: LevelDefinition = {
   id: "level-1",
   name: "Level 1",
   subtitle: "The Bone Gate",
+  levelNumber: 1,
   durationLimit: 45,
   seed: 1729,
+  chest: {
+    itemLevel: 1,
+    rarityWeights: {
+      common: 700,
+      uncommon: 220,
+      rare: 65,
+      epic: 13,
+      legendary: 2,
+      set: 1,
+    },
+    goldBonus: {
+      min: 4,
+      max: 12,
+    },
+  },
   enemyWaves: [
     { enemyId: "skeleton", count: 10, startsAt: 0, interval: 0.8, gate: "north" },
     { enemyId: "skeleton", count: 8, startsAt: 4, interval: 0.75, gate: "east" },

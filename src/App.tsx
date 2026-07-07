@@ -10,14 +10,16 @@ import {
   selectCampaignClass,
   type CampaignState,
 } from "./game/progression";
+import { generateChestReward } from "./game/loot";
 import { simulateCombat } from "./game/simulateCombat";
-import type { CombatResult } from "./game/types";
+import type { ChestReward, CombatResult } from "./game/types";
 
 const SAVE_KEY = "tbd-defense:campaign";
 
 export function App() {
   const [campaign, setCampaign] = useState<CampaignState>(() => loadCampaign());
   const [combatResult, setCombatResult] = useState<CombatResult | null>(null);
+  const [lastChestReward, setLastChestReward] = useState<ChestReward | null>(null);
   const [runId, setRunId] = useState(0);
   const selectedClass = useMemo(
     () => heroClasses.find((heroClass) => heroClass.id === campaign.selectedClassId) ?? heroClasses[0],
@@ -34,9 +36,11 @@ export function App() {
 
   function startLevel() {
     const result = simulateCombat(selectedClass, starterLevel);
+    const chestReward = result.won ? generateChestReward(selectedClass, starterLevel, campaign.chestsOpened) : null;
 
     setCombatResult(result);
-    setCampaign((current) => applyCombatRewards(current, result));
+    setLastChestReward(chestReward);
+    setCampaign((current) => applyCombatRewards(current, result, chestReward ?? undefined));
     setRunId((current) => current + 1);
   }
 
@@ -47,11 +51,13 @@ export function App() {
   function selectClass(heroClassId: CampaignState["selectedClassId"]) {
     setCampaign((current) => selectCampaignClass(current, heroClassId));
     setCombatResult(null);
+    setLastChestReward(null);
   }
 
   function resetProgress() {
     setCampaign(createInitialCampaign());
     setCombatResult(null);
+    setLastChestReward(null);
     setRunId((current) => current + 1);
   }
 
@@ -77,7 +83,7 @@ export function App() {
           </span>
           <span>
             <Save size={16} />
-            Local save
+            {campaign.inventory.length} items
           </span>
         </div>
       </section>
@@ -195,11 +201,34 @@ export function App() {
                   <strong>{combatResult.won ? "Rewards banked" : "No reward"}</strong>
                   <span>
                     {combatResult.won
-                      ? "XP, gold, and level completion were saved locally."
+                      ? "XP, gold, chest bonus, and loot were saved locally."
                       : "Defeats can be replayed without changing progression."}
                   </span>
                 </div>
               </div>
+
+              {lastChestReward ? (
+                <div
+                  className={`loot-card rarity-${lastChestReward.item.rarity}`}
+                  style={{ "--rarity": getRarityColor(lastChestReward.item.rarity) } as React.CSSProperties}
+                >
+                  <div className="loot-card-heading">
+                    <span>{formatRarity(lastChestReward.item.rarity)}</span>
+                    <strong>{lastChestReward.item.name}</strong>
+                  </div>
+                  <div className="loot-meta">
+                    <span>{lastChestReward.item.slot}</span>
+                    <span>Item level {lastChestReward.item.itemLevel}</span>
+                    <span>+{lastChestReward.goldBonus} gold</span>
+                  </div>
+                  {lastChestReward.item.setName ? <p className="set-name">{lastChestReward.item.setName}</p> : null}
+                  <ul>
+                    {lastChestReward.item.modifiers.map((modifier) => (
+                      <li key={`${lastChestReward.item.id}-${modifier.stat}`}>{modifier.label}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <button className="secondary-action" onClick={replayLevel} type="button">
                 <RotateCcw size={17} />
@@ -246,4 +275,25 @@ function loadCampaign(): CampaignState {
   } catch {
     return createInitialCampaign();
   }
+}
+
+function formatRarity(rarity: ChestReward["item"]["rarity"]): string {
+  if (rarity === "set") {
+    return "Set piece";
+  }
+
+  return rarity[0].toUpperCase() + rarity.slice(1);
+}
+
+function getRarityColor(rarity: ChestReward["item"]["rarity"]): string {
+  const colors: Record<ChestReward["item"]["rarity"], string> = {
+    common: "#cbd5e1",
+    uncommon: "#4ade80",
+    rare: "#38bdf8",
+    epic: "#c084fc",
+    legendary: "#f59e0b",
+    set: "#2dd4bf",
+  };
+
+  return colors[rarity];
 }
