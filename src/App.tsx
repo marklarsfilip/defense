@@ -1,25 +1,57 @@
-import { useMemo, useState } from "react";
-import { Coins, Play, RotateCcw, Sparkles, Trophy, Zap } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Coins, Play, RotateCcw, Save, Sparkles, Trophy, Zap } from "lucide-react";
 import { CombatReplay } from "./components/CombatReplay";
 import { heroClasses, starterLevel } from "./game/content";
+import {
+  applyCombatRewards,
+  createInitialCampaign,
+  getExperienceForNextLevel,
+  restoreCampaign,
+  selectCampaignClass,
+  type CampaignState,
+} from "./game/progression";
 import { simulateCombat } from "./game/simulateCombat";
-import type { CombatResult, HeroClassId } from "./game/types";
+import type { CombatResult } from "./game/types";
+
+const SAVE_KEY = "tbd-defense:campaign";
 
 export function App() {
-  const [selectedClassId, setSelectedClassId] = useState<HeroClassId>("berserker");
+  const [campaign, setCampaign] = useState<CampaignState>(() => loadCampaign());
   const [combatResult, setCombatResult] = useState<CombatResult | null>(null);
   const [runId, setRunId] = useState(0);
   const selectedClass = useMemo(
-    () => heroClasses.find((heroClass) => heroClass.id === selectedClassId) ?? heroClasses[0],
-    [selectedClassId],
+    () => heroClasses.find((heroClass) => heroClass.id === campaign.selectedClassId) ?? heroClasses[0],
+    [campaign.selectedClassId],
   );
+  const experienceForNextLevel = getExperienceForNextLevel(campaign.heroLevel);
+  const experienceProgress =
+    experienceForNextLevel > 0 ? Math.min(100, Math.round((campaign.experience / experienceForNextLevel) * 100)) : 100;
+  const starterLevelCompleted = campaign.completedLevelIds.includes(starterLevel.id);
+
+  useEffect(() => {
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify(campaign));
+  }, [campaign]);
 
   function startLevel() {
-    setCombatResult(simulateCombat(selectedClass, starterLevel));
+    const result = simulateCombat(selectedClass, starterLevel);
+
+    setCombatResult(result);
+    setCampaign((current) => applyCombatRewards(current, result));
     setRunId((current) => current + 1);
   }
 
   function replayLevel() {
+    setRunId((current) => current + 1);
+  }
+
+  function selectClass(heroClassId: CampaignState["selectedClassId"]) {
+    setCampaign((current) => selectCampaignClass(current, heroClassId));
+    setCombatResult(null);
+  }
+
+  function resetProgress() {
+    setCampaign(createInitialCampaign());
+    setCombatResult(null);
     setRunId((current) => current + 1);
   }
 
@@ -33,15 +65,19 @@ export function App() {
         <div className="resource-strip" aria-label="Prototype resources">
           <span>
             <Sparkles size={16} />
-            Hero level 1
+            Hero level {campaign.heroLevel}
           </span>
           <span>
             <Coins size={16} />
-            0 gold
+            {campaign.gold} gold
           </span>
           <span>
             <Trophy size={16} />
-            Season alpha
+            {campaign.victories} victories
+          </span>
+          <span>
+            <Save size={16} />
+            Local save
           </span>
         </div>
       </section>
@@ -56,12 +92,9 @@ export function App() {
           <div className="class-list">
             {heroClasses.map((heroClass) => (
               <button
-                className={`class-card ${selectedClassId === heroClass.id ? "selected" : ""}`}
+                className={`class-card ${campaign.selectedClassId === heroClass.id ? "selected" : ""}`}
                 key={heroClass.id}
-                onClick={() => {
-                  setSelectedClassId(heroClass.id);
-                  setCombatResult(null);
-                }}
+                onClick={() => selectClass(heroClass.id)}
                 style={{ "--accent": heroClass.color } as React.CSSProperties}
                 type="button"
               >
@@ -98,9 +131,30 @@ export function App() {
             </dl>
           </div>
 
+          <div className="progress-panel" aria-label="Campaign progression">
+            <div className="progress-row">
+              <span>XP</span>
+              <strong>
+                {experienceForNextLevel > 0
+                  ? `${campaign.experience} / ${experienceForNextLevel}`
+                  : "Max level"}
+              </strong>
+            </div>
+            <div className="progress-track">
+              <div style={{ width: `${experienceProgress}%` }} />
+            </div>
+            <div className="progress-row">
+              <span>{starterLevel.name}</span>
+              <strong>{starterLevelCompleted ? "Cleared" : "Uncleared"}</strong>
+            </div>
+          </div>
+
           <button className="primary-action" onClick={startLevel} type="button">
             <Play size={18} />
             Start level
+          </button>
+          <button className="text-action" onClick={resetProgress} type="button">
+            Reset local progress
           </button>
         </aside>
 
@@ -138,8 +192,12 @@ export function App() {
               <div className="loot-box">
                 <Zap size={18} />
                 <div>
-                  <strong>Loot chest earned</strong>
-                  <span>Prototype reward: cracked bone cache</span>
+                  <strong>{combatResult.won ? "Rewards banked" : "No reward"}</strong>
+                  <span>
+                    {combatResult.won
+                      ? "XP, gold, and level completion were saved locally."
+                      : "Defeats can be replayed without changing progression."}
+                  </span>
                 </div>
               </div>
 
@@ -154,7 +212,7 @@ export function App() {
                 Pick a class and start the level. The result will be simulated first, then rendered as a 3D
                 spectator fight.
               </p>
-              <p>Level 1 spawns 30 skeletons from three gates.</p>
+              <p>Level 1 spawns 30 skeletons from three gates. Victory rewards persist in this browser.</p>
             </div>
           )}
 
@@ -180,3 +238,12 @@ export function App() {
   );
 }
 
+function loadCampaign(): CampaignState {
+  try {
+    const saved = window.localStorage.getItem(SAVE_KEY);
+
+    return restoreCampaign(saved ? JSON.parse(saved) : null);
+  } catch {
+    return createInitialCampaign();
+  }
+}

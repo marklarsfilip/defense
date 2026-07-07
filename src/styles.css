@@ -194,6 +194,42 @@ button {
   font-weight: 800;
 }
 
+.progress-panel {
+  display: grid;
+  gap: 9px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #aeb7c6;
+  font-size: 12px;
+}
+
+.progress-row strong {
+  color: #f5f7fb;
+  font-size: 13px;
+}
+
+.progress-track {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.progress-track div {
+  height: 100%;
+  border-radius: inherit;
+  background: #f2c14e;
+}
+
 .primary-action,
 .secondary-action {
   display: inline-flex;
@@ -217,6 +253,24 @@ button {
   margin-top: 14px;
   background: #e6edf7;
   color: #131820;
+}
+
+.text-action {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #aeb7c6;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.text-action:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f7fb;
 }
 
 .combat-stage {
@@ -405,4 +459,3 @@ button {
     flex-direction: column;
   }
 }
-
