@@ -8,6 +8,8 @@ export interface CampaignState {
   victories: number;
   totalEnemiesDefeated: number;
   completedLevelIds: string[];
+  nextLevelNumber: number;
+  queuedBonusLevelAfter: number | null;
   chestsOpened: number;
   inventory: LootItem[];
 }
@@ -24,6 +26,8 @@ export function createInitialCampaign(): CampaignState {
     victories: 0,
     totalEnemiesDefeated: 0,
     completedLevelIds: [],
+    nextLevelNumber: 1,
+    queuedBonusLevelAfter: null,
     chestsOpened: 0,
     inventory: [],
   };
@@ -36,7 +40,12 @@ export function selectCampaignClass(state: CampaignState, selectedClassId: HeroC
   };
 }
 
-export function applyCombatRewards(state: CampaignState, result: CombatResult, chestReward?: ChestReward): CampaignState {
+export function applyCombatRewards(
+  state: CampaignState,
+  result: CombatResult,
+  chestReward?: ChestReward,
+  queuedBonusLevelAfter?: number | null,
+): CampaignState {
   if (!result.won) {
     return state;
   }
@@ -54,6 +63,8 @@ export function applyCombatRewards(state: CampaignState, result: CombatResult, c
     victories: state.victories + 1,
     totalEnemiesDefeated: state.totalEnemiesDefeated + result.enemiesDefeated,
     completedLevelIds,
+    nextLevelNumber: result.level.kind === "bonus" ? state.nextLevelNumber : Math.max(state.nextLevelNumber, result.level.levelNumber + 1),
+    queuedBonusLevelAfter: result.level.kind === "bonus" ? null : queuedBonusLevelAfter ?? null,
     chestsOpened: state.chestsOpened + (chestReward ? 1 : 0),
     inventory: chestReward ? [chestReward.item, ...state.inventory] : state.inventory,
   };
@@ -91,6 +102,11 @@ export function restoreCampaign(value: unknown): CampaignState {
     completedLevelIds: Array.isArray(candidate.completedLevelIds)
       ? candidate.completedLevelIds.filter((id): id is string => typeof id === "string")
       : initial.completedLevelIds,
+    nextLevelNumber: clampInteger(candidate.nextLevelNumber, 1, Number.MAX_SAFE_INTEGER, initial.nextLevelNumber),
+    queuedBonusLevelAfter:
+      typeof candidate.queuedBonusLevelAfter === "number" && Number.isFinite(candidate.queuedBonusLevelAfter)
+        ? Math.max(1, Math.floor(candidate.queuedBonusLevelAfter))
+        : null,
     chestsOpened: clampInteger(candidate.chestsOpened, 0, Number.MAX_SAFE_INTEGER, initial.chestsOpened),
     inventory: Array.isArray(candidate.inventory) ? candidate.inventory.filter(isLootItem) : initial.inventory,
   };

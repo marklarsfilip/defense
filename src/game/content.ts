@@ -9,6 +9,7 @@ import type {
   LootRarityDefinition,
   LootSetDefinition,
 } from "./types";
+import { createCampaignLevel } from "./levels";
 
 export const heroClasses: HeroClass[] = [
   {
@@ -147,6 +148,7 @@ export const enemies: Record<string, EnemyDefinition> = {
   skeleton: {
     id: "skeleton",
     name: "Skeleton",
+    traits: ["ground"],
     health: 34,
     armor: 2,
     damage: 2,
@@ -154,6 +156,66 @@ export const enemies: Record<string, EnemyDefinition> = {
     moveSpeed: 1.2,
     rewardXp: 5,
     rewardGold: 3,
+  },
+  boneHawk: {
+    id: "boneHawk",
+    name: "Bone Hawk",
+    traits: ["flying", "fragile"],
+    health: 24,
+    armor: 1,
+    damage: 3,
+    attackSpeed: 0.55,
+    moveSpeed: 1.85,
+    rewardXp: 6,
+    rewardGold: 4,
+  },
+  glassCultist: {
+    id: "glassCultist",
+    name: "Glass Cultist",
+    traits: ["ground", "fragile", "dangerous"],
+    health: 20,
+    armor: 0,
+    damage: 7,
+    attackSpeed: 0.48,
+    moveSpeed: 1.05,
+    rewardXp: 8,
+    rewardGold: 5,
+  },
+  graveBrute: {
+    id: "graveBrute",
+    name: "Grave Brute",
+    traits: ["ground"],
+    health: 92,
+    armor: 9,
+    damage: 6,
+    attackSpeed: 0.24,
+    moveSpeed: 0.8,
+    rewardXp: 18,
+    rewardGold: 12,
+  },
+  gateTitan: {
+    id: "gateTitan",
+    name: "Gate Titan",
+    traits: ["ground", "boss"],
+    health: 520,
+    armor: 18,
+    damage: 12,
+    attackSpeed: 0.32,
+    moveSpeed: 0.62,
+    rewardXp: 140,
+    rewardGold: 110,
+  },
+  glitterhorn: {
+    id: "glitterhorn",
+    name: "Glitterhorn",
+    traits: ["ground", "bonus"],
+    health: 48,
+    armor: 1,
+    damage: 1,
+    attackSpeed: 0.18,
+    moveSpeed: 0.7,
+    rewardXp: 30,
+    rewardGold: 90,
   },
 };
 
@@ -279,31 +341,4 @@ export const lootSets: LootSetDefinition[] = [
   },
 ];
 
-export const starterLevel: LevelDefinition = {
-  id: "level-1",
-  name: "Level 1",
-  subtitle: "The Bone Gate",
-  levelNumber: 1,
-  durationLimit: 45,
-  seed: 1729,
-  chest: {
-    itemLevel: 1,
-    rarityWeights: {
-      common: 700,
-      uncommon: 220,
-      rare: 65,
-      epic: 13,
-      legendary: 2,
-      set: 1,
-    },
-    goldBonus: {
-      min: 4,
-      max: 12,
-    },
-  },
-  enemyWaves: [
-    { enemyId: "skeleton", count: 10, startsAt: 0, interval: 0.8, gate: "north" },
-    { enemyId: "skeleton", count: 8, startsAt: 4, interval: 0.75, gate: "east" },
-    { enemyId: "skeleton", count: 12, startsAt: 8, interval: 0.55, gate: "west" },
-  ],
-};
+export const starterLevel: LevelDefinition = createCampaignLevel(1);

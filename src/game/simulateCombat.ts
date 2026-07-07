@@ -76,12 +76,13 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         const critical = random() < heroClass.stats.critChance;
         const baseDamage = heroClass.stats.damage + heroClass.stats.abilityPower * 0.55;
         const multiplier = (critical ? heroClass.stats.critDamage : 1) * (isSpecial ? heroClass.special.damageMultiplier : 1);
-        const rawDamage = Math.round(baseDamage * multiplier);
+        const levelDamageMultiplier = level.combat.heroDamageMultipliers[heroClass.damageKind] ?? 1;
+        const rawDamage = Math.round(baseDamage * multiplier * levelDamageMultiplier);
         const targetIds: string[] = [];
         let dealtDamage = 0;
 
         for (const target of targets) {
-          const damage = mitigateDamage(rawDamage, target.armor);
+          const damage = mitigateDamage(Math.round(rawDamage * getTargetDamageMultiplier(heroClass, target)), target.armor);
           target.health = Math.max(0, target.health - damage);
           dealtDamage = damage;
           targetIds.push(target.id);
@@ -140,18 +141,21 @@ function buildEnemySpawns(level: LevelDefinition): CombatEnemy[] {
 
     for (let i = 0; i < wave.count; i += 1) {
       const spawnTime = wave.startsAt + i * wave.interval;
+      const maxHealth = Math.round(definition.health * level.combat.enemyHealthMultiplier);
+
       spawns.push({
         id: `${definition.id}-${index}`,
         definitionId: definition.id,
         name: definition.name,
-        maxHealth: definition.health,
-        health: definition.health,
+        traits: definition.traits,
+        maxHealth,
+        health: maxHealth,
         armor: definition.armor,
-        damage: definition.damage,
+        damage: Math.max(1, Math.round(definition.damage * level.combat.enemyDamageMultiplier)),
         attackSpeed: definition.attackSpeed,
         moveSpeed: definition.moveSpeed,
-        rewardXp: definition.rewardXp,
-        rewardGold: definition.rewardGold,
+        rewardXp: Math.max(1, Math.round(definition.rewardXp * level.combat.rewardMultiplier)),
+        rewardGold: Math.max(1, Math.round(definition.rewardGold * level.combat.rewardMultiplier)),
         gate: wave.gate,
         spawnTime,
       });
@@ -165,6 +169,14 @@ function buildEnemySpawns(level: LevelDefinition): CombatEnemy[] {
 function mitigateDamage(rawDamage: number, armor: number): number {
   const armorMultiplier = 100 / (100 + armor * 6);
   return Math.max(1, Math.round(rawDamage * armorMultiplier));
+}
+
+function getTargetDamageMultiplier(heroClass: HeroClass, enemy: CombatEnemy): number {
+  if (heroClass.damageKind === "melee" && enemy.traits.includes("flying")) {
+    return 0.38;
+  }
+
+  return 1;
 }
 
 function basicAttackLabel(kind: HeroClass["damageKind"]): string {

@@ -42,6 +42,7 @@ describe("progression", () => {
     expect(campaign.victories).toBe(1);
     expect(campaign.totalEnemiesDefeated).toBe(30);
     expect(campaign.completedLevelIds).toEqual([starterLevel.id]);
+    expect(campaign.nextLevelNumber).toBe(2);
   });
 
   it("levels up from earned experience", () => {
@@ -58,6 +59,23 @@ describe("progression", () => {
     expect(campaign.gold).toBe(97);
     expect(campaign.chestsOpened).toBe(1);
     expect(campaign.inventory).toEqual([chestReward.item]);
+  });
+
+  it("queues bonus levels without consuming the next normal level until cleared", () => {
+    const queuedCampaign = applyCombatRewards(createInitialCampaign(), victoryResult, chestReward, 1);
+    const bonusCampaign = applyCombatRewards(queuedCampaign, {
+      ...victoryResult,
+      level: {
+        ...victoryResult.level,
+        id: "bonus-pasture-after-1",
+        kind: "bonus",
+      },
+    });
+
+    expect(queuedCampaign.nextLevelNumber).toBe(2);
+    expect(queuedCampaign.queuedBonusLevelAfter).toBe(1);
+    expect(bonusCampaign.nextLevelNumber).toBe(2);
+    expect(bonusCampaign.queuedBonusLevelAfter).toBeNull();
   });
 
   it("does not apply rewards for defeats", () => {
@@ -80,10 +98,14 @@ describe("progression", () => {
       victories: 2,
       totalEnemiesDefeated: 60,
       completedLevelIds: [starterLevel.id, 123],
+      nextLevelNumber: 4,
+      queuedBonusLevelAfter: 3,
     });
 
     expect(campaign.selectedClassId).toBe("ranger");
     expect(campaign.heroLevel).toBe(3);
     expect(campaign.completedLevelIds).toEqual([starterLevel.id]);
+    expect(campaign.nextLevelNumber).toBe(4);
+    expect(campaign.queuedBonusLevelAfter).toBe(3);
   });
 });

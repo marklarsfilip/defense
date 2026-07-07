@@ -2,6 +2,10 @@ export type HeroClassId = "berserker" | "arcanist" | "ranger" | "summoner" | "gu
 
 export type DamageKind = "melee" | "magic" | "ranged" | "summon";
 
+export type EnemyTrait = "ground" | "flying" | "fragile" | "dangerous" | "boss" | "bonus";
+
+export type LevelKind = "normal" | "boss" | "bonus";
+
 export type LootRarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | "set";
 
 export type EquipmentSlot = "weapon" | "armor" | "trinket";
@@ -40,6 +44,7 @@ export interface HeroClass {
 export interface EnemyDefinition {
   id: string;
   name: string;
+  traits: EnemyTrait[];
   health: number;
   armor: number;
   damage: number;
@@ -61,11 +66,14 @@ export interface LevelDefinition {
   id: string;
   name: string;
   subtitle: string;
+  kind: LevelKind;
   levelNumber: number;
   enemyWaves: EnemySpawn[];
   durationLimit: number;
   seed: number;
   chest: LevelChestDefinition;
+  combat: LevelCombatRules;
+  notes: string[];
 }
 
 export interface LevelChestDefinition {
@@ -75,6 +83,13 @@ export interface LevelChestDefinition {
     min: number;
     max: number;
   };
+}
+
+export interface LevelCombatRules {
+  enemyHealthMultiplier: number;
+  enemyDamageMultiplier: number;
+  rewardMultiplier: number;
+  heroDamageMultipliers: Partial<Record<DamageKind, number>>;
 }
 
 export interface LootRarityDefinition {
@@ -142,6 +157,7 @@ export interface CombatEnemy {
   id: string;
   definitionId: string;
   name: string;
+  traits: EnemyTrait[];
   maxHealth: number;
   health: number;
   armor: number;

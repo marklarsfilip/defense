@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Coins, Play, RotateCcw, Save, Sparkles, Trophy, Zap } from "lucide-react";
 import { CombatReplay } from "./components/CombatReplay";
-import { heroClasses, starterLevel } from "./game/content";
+import { heroClasses } from "./game/content";
+import { createBonusLevel, createCampaignLevel, shouldQueueBonusLevel } from "./game/levels";
 import {
   applyCombatRewards,
   createInitialCampaign,
@@ -25,22 +26,33 @@ export function App() {
     () => heroClasses.find((heroClass) => heroClass.id === campaign.selectedClassId) ?? heroClasses[0],
     [campaign.selectedClassId],
   );
+  const currentLevel = useMemo(
+    () =>
+      campaign.queuedBonusLevelAfter
+        ? createBonusLevel(campaign.queuedBonusLevelAfter)
+        : createCampaignLevel(campaign.nextLevelNumber),
+    [campaign.nextLevelNumber, campaign.queuedBonusLevelAfter],
+  );
   const experienceForNextLevel = getExperienceForNextLevel(campaign.heroLevel);
   const experienceProgress =
     experienceForNextLevel > 0 ? Math.min(100, Math.round((campaign.experience / experienceForNextLevel) * 100)) : 100;
-  const starterLevelCompleted = campaign.completedLevelIds.includes(starterLevel.id);
+  const currentLevelCompleted = campaign.completedLevelIds.includes(currentLevel.id);
 
   useEffect(() => {
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(campaign));
   }, [campaign]);
 
   function startLevel() {
-    const result = simulateCombat(selectedClass, starterLevel);
-    const chestReward = result.won ? generateChestReward(selectedClass, starterLevel, campaign.chestsOpened) : null;
+    const result = simulateCombat(selectedClass, currentLevel);
+    const chestReward = result.won ? generateChestReward(selectedClass, currentLevel, campaign.chestsOpened) : null;
+    const queuedBonusLevelAfter =
+      result.won && currentLevel.kind !== "bonus" && shouldQueueBonusLevel(currentLevel.levelNumber, campaign.victories)
+        ? currentLevel.levelNumber
+        : null;
 
     setCombatResult(result);
     setLastChestReward(chestReward);
-    setCampaign((current) => applyCombatRewards(current, result, chestReward ?? undefined));
+    setCampaign((current) => applyCombatRewards(current, result, chestReward ?? undefined, queuedBonusLevelAfter));
     setRunId((current) => current + 1);
   }
 
@@ -66,7 +78,7 @@ export function App() {
       <section className="top-bar" aria-label="Game status">
         <div>
           <p className="eyebrow">TBD Defense prototype</p>
-          <h1>{starterLevel.subtitle}</h1>
+          <h1>{currentLevel.subtitle}</h1>
         </div>
         <div className="resource-strip" aria-label="Prototype resources">
           <span>
@@ -79,7 +91,7 @@ export function App() {
           </span>
           <span>
             <Trophy size={16} />
-            {campaign.victories} victories
+            {currentLevel.kind === "bonus" ? "Bonus level" : `${campaign.victories} victories`}
           </span>
           <span>
             <Save size={16} />
@@ -150,14 +162,20 @@ export function App() {
               <div style={{ width: `${experienceProgress}%` }} />
             </div>
             <div className="progress-row">
-              <span>{starterLevel.name}</span>
-              <strong>{starterLevelCompleted ? "Cleared" : "Uncleared"}</strong>
+              <span>{currentLevel.name}</span>
+              <strong>{currentLevelCompleted ? "Cleared" : currentLevel.kind}</strong>
             </div>
+          </div>
+
+          <div className="level-notes" aria-label="Level traits">
+            {currentLevel.notes.map((note) => (
+              <span key={note}>{note}</span>
+            ))}
           </div>
 
           <button className="primary-action" onClick={startLevel} type="button">
             <Play size={18} />
-            Start level
+            Start {currentLevel.name}
           </button>
           <button className="text-action" onClick={resetProgress} type="button">
             Reset local progress
@@ -241,7 +259,7 @@ export function App() {
                 Pick a class and start the level. The result will be simulated first, then rendered as a 3D
                 spectator fight.
               </p>
-              <p>Level 1 spawns 30 skeletons from three gates. Victory rewards persist in this browser.</p>
+              <p>Boss levels appear every 10 levels. Rare bonus pastures can appear between normal levels.</p>
             </div>
           )}
 

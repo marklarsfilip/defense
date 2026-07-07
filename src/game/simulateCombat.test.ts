@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { heroClasses, starterLevel } from "./content";
+import { createCampaignLevel } from "./levels";
 import { simulateCombat } from "./simulateCombat";
 
 describe("simulateCombat", () => {
@@ -25,5 +26,15 @@ describe("simulateCombat", () => {
     expect(result.xp).toBe(150);
     expect(result.gold).toBe(90);
   });
-});
 
+  it("lets melee heroes hit flying enemies with weaker fallback attacks", () => {
+    const flyingLevel = createCampaignLevel(5);
+    const berserker = heroClasses.find((heroClass) => heroClass.id === "berserker")!;
+    const ranger = heroClasses.find((heroClass) => heroClass.id === "ranger")!;
+    const meleeResult = simulateCombat(berserker, flyingLevel);
+    const rangerResult = simulateCombat(ranger, flyingLevel);
+
+    expect(meleeResult.enemiesDefeated).toBeGreaterThan(0);
+    expect(rangerResult.enemiesDefeated).toBeGreaterThan(meleeResult.enemiesDefeated);
+  });
+});
