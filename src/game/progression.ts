@@ -1,4 +1,5 @@
 import type { ChestReward, CombatResult, HeroClassId, LootItem, LootRarity } from "./types";
+import { filterTalentIdsForClass, getTalentPointBudget } from "./talents";
 
 export interface CampaignState {
   selectedClassId: HeroClassId;
@@ -12,6 +13,7 @@ export interface CampaignState {
   queuedBonusLevelAfter: number | null;
   chestsOpened: number;
   inventory: LootItem[];
+  selectedTalentIds: string[];
 }
 
 const DEFAULT_CLASS_ID: HeroClassId = "berserker";
@@ -30,6 +32,7 @@ export function createInitialCampaign(): CampaignState {
     queuedBonusLevelAfter: null,
     chestsOpened: 0,
     inventory: [],
+    selectedTalentIds: [],
   };
 }
 
@@ -37,6 +40,22 @@ export function selectCampaignClass(state: CampaignState, selectedClassId: HeroC
   return {
     ...state,
     selectedClassId,
+    selectedTalentIds: filterTalentIdsForClass(state.selectedTalentIds, selectedClassId),
+  };
+}
+
+export function learnCampaignTalent(state: CampaignState, talentId: string): CampaignState {
+  if (state.selectedTalentIds.includes(talentId)) {
+    return state;
+  }
+
+  if (state.selectedTalentIds.length >= getTalentPointBudget(state.heroLevel)) {
+    return state;
+  }
+
+  return {
+    ...state,
+    selectedTalentIds: [...state.selectedTalentIds, talentId],
   };
 }
 
@@ -86,9 +105,13 @@ export function restoreCampaign(value: unknown): CampaignState {
   }
 
   const candidate = value as Partial<CampaignState>;
+  const selectedClassId = isHeroClassId(candidate.selectedClassId) ? candidate.selectedClassId : initial.selectedClassId;
+  const selectedTalentIds = Array.isArray(candidate.selectedTalentIds)
+    ? candidate.selectedTalentIds.filter((id): id is string => typeof id === "string")
+    : initial.selectedTalentIds;
 
   return {
-    selectedClassId: isHeroClassId(candidate.selectedClassId) ? candidate.selectedClassId : initial.selectedClassId,
+    selectedClassId,
     heroLevel: clampInteger(candidate.heroLevel, 1, MAX_HERO_LEVEL, initial.heroLevel),
     experience: clampInteger(candidate.experience, 0, Number.MAX_SAFE_INTEGER, initial.experience),
     gold: clampInteger(candidate.gold, 0, Number.MAX_SAFE_INTEGER, initial.gold),
@@ -109,6 +132,7 @@ export function restoreCampaign(value: unknown): CampaignState {
         : null,
     chestsOpened: clampInteger(candidate.chestsOpened, 0, Number.MAX_SAFE_INTEGER, initial.chestsOpened),
     inventory: Array.isArray(candidate.inventory) ? candidate.inventory.filter(isLootItem) : initial.inventory,
+    selectedTalentIds: filterTalentIdsForClass(selectedTalentIds, selectedClassId),
   };
 }
 

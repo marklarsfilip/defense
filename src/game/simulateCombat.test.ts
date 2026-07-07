@@ -28,7 +28,7 @@ describe("simulateCombat", () => {
   });
 
   it("lets melee heroes hit flying enemies with weaker fallback attacks", () => {
-    const flyingLevel = createCampaignLevel(5);
+    const flyingLevel = createCampaignLevel(2);
     const berserker = heroClasses.find((heroClass) => heroClass.id === "berserker")!;
     const ranger = heroClasses.find((heroClass) => heroClass.id === "ranger")!;
     const meleeResult = simulateCombat(berserker, flyingLevel);

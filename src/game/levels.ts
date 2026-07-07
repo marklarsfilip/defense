@@ -38,6 +38,18 @@ export function createCampaignLevel(levelNumber: number): LevelDefinition {
     return createBruteLevel(levelNumber);
   }
 
+  if (archetype === "caster") {
+    return createCasterLevel(levelNumber);
+  }
+
+  if (archetype === "swarm") {
+    return createSwarmLevel(levelNumber);
+  }
+
+  if (archetype === "shield") {
+    return createShieldLevel(levelNumber);
+  }
+
   return createMixedLevel(levelNumber);
 }
 
@@ -177,6 +189,62 @@ function createBruteLevel(levelNumber: number): LevelDefinition {
   };
 }
 
+function createCasterLevel(levelNumber: number): LevelDefinition {
+  return {
+    ...baseLevel(levelNumber, "normal", "Lantern Storm", "Flying casters"),
+    combat: {
+      enemyHealthMultiplier: Math.max(0.7, levelScale(levelNumber) * 0.78),
+      enemyDamageMultiplier: 1.45 + levelNumber * 0.035,
+      rewardMultiplier: 1.2,
+      heroDamageMultipliers: {
+        ranged: 1.22,
+        magic: 1.05,
+        melee: 0.92,
+      },
+    },
+    notes: ["Flying casters", "High incoming damage", "Ranged control favored"],
+    enemyWaves: buildWaves("spellWisp", levelNumber, 24, 0.62),
+  };
+}
+
+function createSwarmLevel(levelNumber: number): LevelDefinition {
+  return {
+    ...baseLevel(levelNumber, "normal", "Rot Tide", "Large swarm"),
+    combat: {
+      enemyHealthMultiplier: Math.max(0.65, levelScale(levelNumber) * 0.72),
+      enemyDamageMultiplier: 0.82 + levelNumber * 0.018,
+      rewardMultiplier: 0.92,
+      heroDamageMultipliers: {
+        magic: 1.2,
+        summon: 1.16,
+        melee: 1.08,
+      },
+    },
+    notes: ["Many weak enemies", "Area damage favored", "Single-target builds waste attacks"],
+    enemyWaves: buildWaves("rotImp", levelNumber, 48, 0.28),
+  };
+}
+
+function createShieldLevel(levelNumber: number): LevelDefinition {
+  return {
+    ...baseLevel(levelNumber, "normal", "Shield Line", "Armored formation"),
+    combat: {
+      enemyHealthMultiplier: levelScale(levelNumber),
+      enemyDamageMultiplier: 0.95 + levelNumber * 0.02,
+      rewardMultiplier: 1.16,
+      heroDamageMultipliers: {
+        magic: 1.24,
+        ranged: 0.9,
+      },
+    },
+    notes: ["Heavy armor", "Magic favored", "Precision damage is blunted"],
+    enemyWaves: [
+      ...buildWaves("shieldBearer", levelNumber, 18, 0.82),
+      { enemyId: "glassCultist", count: Math.max(2, Math.floor(levelNumber / 2)), startsAt: 6, interval: 0.7, gate: "east" },
+    ],
+  };
+}
+
 function createMixedLevel(levelNumber: number): LevelDefinition {
   return {
     ...baseLevel(levelNumber, "normal", "Restless Dead", "Mixed assault"),
@@ -249,10 +317,10 @@ function buildWaves(enemyId: string, levelNumber: number, baseCount: number, int
   }));
 }
 
-function pickArchetype(levelNumber: number): "mixed" | "flying" | "glass" | "brute" {
-  const sequence = ["mixed", "flying", "glass", "brute"] as const;
+function pickArchetype(levelNumber: number): "mixed" | "flying" | "glass" | "brute" | "caster" | "swarm" | "shield" {
+  const sequence = ["flying", "glass", "brute", "caster", "swarm", "shield", "mixed"] as const;
 
-  return sequence[levelNumber % sequence.length];
+  return sequence[(levelNumber - 2) % sequence.length];
 }
 
 function levelScale(levelNumber: number): number {

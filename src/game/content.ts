@@ -8,6 +8,7 @@ import type {
   LootRarity,
   LootRarityDefinition,
   LootSetDefinition,
+  TalentDefinition,
 } from "./types";
 import { createCampaignLevel } from "./levels";
 
@@ -184,7 +185,7 @@ export const enemies: Record<string, EnemyDefinition> = {
   graveBrute: {
     id: "graveBrute",
     name: "Grave Brute",
-    traits: ["ground"],
+    traits: ["ground", "armored"],
     health: 92,
     armor: 9,
     damage: 6,
@@ -216,6 +217,42 @@ export const enemies: Record<string, EnemyDefinition> = {
     moveSpeed: 0.7,
     rewardXp: 30,
     rewardGold: 90,
+  },
+  spellWisp: {
+    id: "spellWisp",
+    name: "Spell Wisp",
+    traits: ["flying", "caster", "fragile"],
+    health: 18,
+    armor: 0,
+    damage: 9,
+    attackSpeed: 0.42,
+    moveSpeed: 1.6,
+    rewardXp: 10,
+    rewardGold: 7,
+  },
+  shieldBearer: {
+    id: "shieldBearer",
+    name: "Shield Bearer",
+    traits: ["ground", "armored"],
+    health: 58,
+    armor: 18,
+    damage: 4,
+    attackSpeed: 0.28,
+    moveSpeed: 0.72,
+    rewardXp: 11,
+    rewardGold: 8,
+  },
+  rotImp: {
+    id: "rotImp",
+    name: "Rot Imp",
+    traits: ["ground", "swarm", "fragile"],
+    health: 14,
+    armor: 0,
+    damage: 3,
+    attackSpeed: 0.72,
+    moveSpeed: 1.75,
+    rewardXp: 4,
+    rewardGold: 2,
   },
 };
 
@@ -270,6 +307,11 @@ export const lootBaseItems: LootBaseItemDefinition[] = [
   { id: "patched-mail", name: "Patched Mail", slot: "armor" },
   { id: "bone-charm", name: "Bone Charm", slot: "trinket" },
   { id: "gate-ring", name: "Gate Ring", slot: "trinket" },
+  { id: "hawk-fletched-bow", name: "Hawk-Fletched Bow", slot: "weapon" },
+  { id: "rune-stitched-vest", name: "Rune-Stitched Vest", slot: "armor" },
+  { id: "ember-focus", name: "Ember Focus", slot: "trinket" },
+  { id: "iron-buckler", name: "Iron Buckler", slot: "armor" },
+  { id: "spirit-bell", name: "Spirit Bell", slot: "trinket" },
 ];
 
 export const legendaryLootItems: LootNamedItemDefinition[] = [
@@ -280,6 +322,10 @@ export const legendaryLootItems: LootNamedItemDefinition[] = [
   { id: "void-hum-resonator", name: "Void-Hum Resonator", slot: "weapon" },
   { id: "ashen-contract-medallion", name: "Ashen Contract Medallion", slot: "trinket" },
   { id: "last-watch-longcoat", name: "Last Watch Longcoat", slot: "armor" },
+  { id: "stormdoor-hammer", name: "Stormdoor Hammer", slot: "weapon" },
+  { id: "red-keep-signet", name: "Red Keep Signet", slot: "trinket" },
+  { id: "white-hart-cloak", name: "White Hart Cloak", slot: "armor" },
+  { id: "salt-circle-lantern", name: "Salt-Circle Lantern", slot: "trinket" },
 ];
 
 export const lootAffixes: LootAffixDefinition[] = [
@@ -338,6 +384,70 @@ export const lootSets: LootSetDefinition[] = [
       { name: "Twin-Sun Desert Wrap", slot: "armor" },
       { name: "Rebel Spark Cell", slot: "trinket" },
     ],
+  },
+];
+
+export const talents: TalentDefinition[] = [
+  {
+    id: "battle-hardened",
+    name: "Battle Hardened",
+    description: "A reliable health boost for any class.",
+    levelRequirement: 2,
+    statModifiers: { health: 35 },
+  },
+  {
+    id: "sharpened-instincts",
+    name: "Sharpened Instincts",
+    description: "Small critical chance and damage gain.",
+    levelRequirement: 2,
+    statModifiers: { critChance: 0.04, critDamage: 0.12 },
+  },
+  {
+    id: "quick-hands",
+    name: "Quick Hands",
+    description: "Attack and cast slightly faster.",
+    levelRequirement: 4,
+    statModifiers: { attackSpeed: 0.12, cooldownReduction: 0.03 },
+  },
+  {
+    id: "throwing-drills",
+    name: "Throwing Drills",
+    description: "Melee classes gain damage for awkward anti-air fights.",
+    levelRequirement: 4,
+    classId: "berserker",
+    statModifiers: { damage: 5, range: 0.5 },
+  },
+  {
+    id: "rune-overflow",
+    name: "Rune Overflow",
+    description: "Arcanist spells hit harder.",
+    levelRequirement: 4,
+    classId: "arcanist",
+    statModifiers: { abilityPower: 12, cooldownReduction: 0.04 },
+  },
+  {
+    id: "clean-sightlines",
+    name: "Clean Sightlines",
+    description: "Ranger attacks reward precision.",
+    levelRequirement: 4,
+    classId: "ranger",
+    statModifiers: { damage: 4, critChance: 0.05 },
+  },
+  {
+    id: "deeper-bonds",
+    name: "Deeper Bonds",
+    description: "Summoned spirits scale harder.",
+    levelRequirement: 4,
+    classId: "summoner",
+    statModifiers: { abilityPower: 10, attackSpeed: 0.08 },
+  },
+  {
+    id: "shield-oath",
+    name: "Shield Oath",
+    description: "Guardian trades fear for staying power.",
+    levelRequirement: 4,
+    classId: "guardian",
+    statModifiers: { armor: 7, health: 40 },
   },
 ];
 

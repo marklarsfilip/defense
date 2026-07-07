@@ -247,6 +247,62 @@ button {
   font-weight: 800;
 }
 
+.talent-panel {
+  display: grid;
+  gap: 9px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.learned-talents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.learned-talents span {
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(242, 193, 78, 0.14);
+  color: #fff2c8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.talent-list {
+  display: grid;
+  gap: 7px;
+}
+
+.talent-list button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: #232936;
+  color: #f5f7fb;
+  cursor: pointer;
+  text-align: left;
+}
+
+.talent-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.talent-list button span,
+.talent-list p {
+  margin: 0;
+  color: #b8c2d2;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
 .primary-action,
 .secondary-action {
   display: inline-flex;

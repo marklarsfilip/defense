@@ -40,12 +40,18 @@ describe("levels", () => {
   });
 
   it("generates matchup notes for flying and fragile dangerous levels", () => {
-    const flyingLevel = createCampaignLevel(5);
-    const glassLevel = createCampaignLevel(6);
+    const flyingLevel = createCampaignLevel(2);
+    const glassLevel = createCampaignLevel(3);
+    const casterLevel = createCampaignLevel(5);
+    const swarmLevel = createCampaignLevel(6);
+    const shieldLevel = createCampaignLevel(7);
 
     expect(flyingLevel.notes).toContain("Melee uses weak thrown attacks");
     expect(flyingLevel.enemyWaves.every((wave) => wave.enemyId === "boneHawk")).toBe(true);
     expect(glassLevel.notes).toContain("Melee burst favored");
     expect(glassLevel.enemyWaves.every((wave) => wave.enemyId === "glassCultist")).toBe(true);
+    expect(casterLevel.enemyWaves.every((wave) => wave.enemyId === "spellWisp")).toBe(true);
+    expect(swarmLevel.enemyWaves.every((wave) => wave.enemyId === "rotImp")).toBe(true);
+    expect(shieldLevel.enemyWaves.some((wave) => wave.enemyId === "shieldBearer")).toBe(true);
   });
 });

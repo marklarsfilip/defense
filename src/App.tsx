@@ -7,12 +7,14 @@ import {
   applyCombatRewards,
   createInitialCampaign,
   getExperienceForNextLevel,
+  learnCampaignTalent,
   restoreCampaign,
   selectCampaignClass,
   type CampaignState,
 } from "./game/progression";
 import { generateChestReward } from "./game/loot";
 import { simulateCombat } from "./game/simulateCombat";
+import { applyTalentsToHero, getAvailableTalents, getSelectedTalents, getTalentPointBudget } from "./game/talents";
 import type { ChestReward, CombatResult } from "./game/types";
 
 const SAVE_KEY = "tbd-defense:campaign";
@@ -26,6 +28,13 @@ export function App() {
     () => heroClasses.find((heroClass) => heroClass.id === campaign.selectedClassId) ?? heroClasses[0],
     [campaign.selectedClassId],
   );
+  const effectiveHero = useMemo(
+    () => applyTalentsToHero(selectedClass, campaign.selectedTalentIds),
+    [selectedClass, campaign.selectedTalentIds],
+  );
+  const talentPointBudget = getTalentPointBudget(campaign.heroLevel);
+  const availableTalents = getAvailableTalents(campaign.heroLevel, campaign.selectedClassId, campaign.selectedTalentIds);
+  const selectedTalents = getSelectedTalents(campaign.selectedTalentIds);
   const currentLevel = useMemo(
     () =>
       campaign.queuedBonusLevelAfter
@@ -43,8 +52,8 @@ export function App() {
   }, [campaign]);
 
   function startLevel() {
-    const result = simulateCombat(selectedClass, currentLevel);
-    const chestReward = result.won ? generateChestReward(selectedClass, currentLevel, campaign.chestsOpened) : null;
+    const result = simulateCombat(effectiveHero, currentLevel);
+    const chestReward = result.won ? generateChestReward(effectiveHero, currentLevel, campaign.chestsOpened) : null;
     const queuedBonusLevelAfter =
       result.won && currentLevel.kind !== "bonus" && shouldQueueBonusLevel(currentLevel.levelNumber, campaign.victories)
         ? currentLevel.levelNumber
@@ -71,6 +80,10 @@ export function App() {
     setCombatResult(null);
     setLastChestReward(null);
     setRunId((current) => current + 1);
+  }
+
+  function learnTalent(talentId: string) {
+    setCampaign((current) => learnCampaignTalent(current, talentId));
   }
 
   return (
@@ -132,15 +145,15 @@ export function App() {
             <dl>
               <div>
                 <dt>Damage</dt>
-                <dd>{selectedClass.stats.damage}</dd>
+                <dd>{effectiveHero.stats.damage}</dd>
               </div>
               <div>
                 <dt>Speed</dt>
-                <dd>{selectedClass.stats.attackSpeed.toFixed(2)}/s</dd>
+                <dd>{effectiveHero.stats.attackSpeed.toFixed(2)}/s</dd>
               </div>
               <div>
                 <dt>Health</dt>
-                <dd>{selectedClass.stats.health}</dd>
+                <dd>{effectiveHero.stats.health}</dd>
               </div>
               <div>
                 <dt>Special</dt>
@@ -173,6 +186,36 @@ export function App() {
             ))}
           </div>
 
+          <div className="talent-panel" aria-label="Talents">
+            <div className="progress-row">
+              <span>Talents</span>
+              <strong>
+                {campaign.selectedTalentIds.length} / {talentPointBudget}
+              </strong>
+            </div>
+            {selectedTalents.length > 0 ? (
+              <div className="learned-talents">
+                {selectedTalents.map((talent) => (
+                  <span key={talent.id}>{talent.name}</span>
+                ))}
+              </div>
+            ) : null}
+            <div className="talent-list">
+              {availableTalents.slice(0, 3).map((talent) => (
+                <button
+                  disabled={campaign.selectedTalentIds.length >= talentPointBudget}
+                  key={talent.id}
+                  onClick={() => learnTalent(talent.id)}
+                  type="button"
+                >
+                  <strong>{talent.name}</strong>
+                  <span>{talent.description}</span>
+                </button>
+              ))}
+              {availableTalents.length === 0 ? <p>No talent choices unlocked yet.</p> : null}
+            </div>
+          </div>
+
           <button className="primary-action" onClick={startLevel} type="button">
             <Play size={18} />
             Start {currentLevel.name}
@@ -183,7 +226,7 @@ export function App() {
         </aside>
 
         <section className="combat-stage" aria-label="3D combat replay">
-          <CombatReplay key={runId} heroClass={selectedClass} result={combatResult} />
+          <CombatReplay key={runId} heroClass={effectiveHero} result={combatResult} />
         </section>
 
         <aside className="panel result-panel" aria-label="Combat result">

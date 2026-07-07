@@ -4,7 +4,9 @@ import {
   applyCombatRewards,
   createInitialCampaign,
   getExperienceForNextLevel,
+  learnCampaignTalent,
   restoreCampaign,
+  selectCampaignClass,
 } from "./progression";
 import type { CombatResult } from "./types";
 
@@ -89,6 +91,30 @@ describe("progression", () => {
     expect(defeatedCampaign).toEqual(createInitialCampaign());
   });
 
+  it("learns talents up to the current point budget", () => {
+    const levelTwoCampaign = {
+      ...createInitialCampaign(),
+      heroLevel: 2,
+    };
+    const firstTalent = learnCampaignTalent(levelTwoCampaign, "battle-hardened");
+    const overspent = learnCampaignTalent(firstTalent, "sharpened-instincts");
+
+    expect(firstTalent.selectedTalentIds).toEqual(["battle-hardened"]);
+    expect(overspent.selectedTalentIds).toEqual(["battle-hardened"]);
+  });
+
+  it("drops incompatible class talents when changing class", () => {
+    const campaign = selectCampaignClass(
+      {
+        ...createInitialCampaign(),
+        selectedTalentIds: ["battle-hardened", "throwing-drills"],
+      },
+      "arcanist",
+    );
+
+    expect(campaign.selectedTalentIds).toEqual(["battle-hardened"]);
+  });
+
   it("restores save data defensively", () => {
     const campaign = restoreCampaign({
       selectedClassId: "ranger",
@@ -100,6 +126,7 @@ describe("progression", () => {
       completedLevelIds: [starterLevel.id, 123],
       nextLevelNumber: 4,
       queuedBonusLevelAfter: 3,
+      selectedTalentIds: ["battle-hardened", 123],
     });
 
     expect(campaign.selectedClassId).toBe("ranger");
@@ -107,5 +134,6 @@ describe("progression", () => {
     expect(campaign.completedLevelIds).toEqual([starterLevel.id]);
     expect(campaign.nextLevelNumber).toBe(4);
     expect(campaign.queuedBonusLevelAfter).toBe(3);
+    expect(campaign.selectedTalentIds).toEqual(["battle-hardened"]);
   });
 });

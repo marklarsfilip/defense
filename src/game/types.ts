@@ -2,7 +2,16 @@ export type HeroClassId = "berserker" | "arcanist" | "ranger" | "summoner" | "gu
 
 export type DamageKind = "melee" | "magic" | "ranged" | "summon";
 
-export type EnemyTrait = "ground" | "flying" | "fragile" | "dangerous" | "boss" | "bonus";
+export type EnemyTrait =
+  | "ground"
+  | "flying"
+  | "fragile"
+  | "dangerous"
+  | "armored"
+  | "caster"
+  | "swarm"
+  | "boss"
+  | "bonus";
 
 export type LevelKind = "normal" | "boss" | "bonus";
 
@@ -39,6 +48,15 @@ export interface HeroClass {
     cleaveTargets: number;
     damageMultiplier: number;
   };
+}
+
+export interface TalentDefinition {
+  id: string;
+  name: string;
+  description: string;
+  levelRequirement: number;
+  classId?: HeroClassId;
+  statModifiers: Partial<Stats>;
 }
 
 export interface EnemyDefinition {
