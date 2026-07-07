@@ -91,6 +91,12 @@ export interface LootBaseItemDefinition {
   slot: EquipmentSlot;
 }
 
+export interface LootNamedItemDefinition {
+  id: string;
+  name: string;
+  slot: EquipmentSlot;
+}
+
 export interface LootAffixDefinition {
   id: string;
   name: string;

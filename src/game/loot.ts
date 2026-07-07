@@ -1,8 +1,7 @@
-import { lootAffixes, lootBaseItems, lootRarities, lootSets } from "./content";
+import { legendaryLootItems, lootAffixes, lootBaseItems, lootRarities, lootSets } from "./content";
 import { createSeededRandom } from "./random";
 import type {
   ChestReward,
-  EquipmentSlot,
   HeroClass,
   LevelDefinition,
   LootAffixDefinition,
@@ -36,7 +35,7 @@ export function generateChestReward(
   const rarity = rollRarity(level.chest.rarityWeights, random);
   const rarityDefinition = lootRarities[rarity];
   const itemLevel = level.chest.itemLevel;
-  const item = rarity === "set" ? rollSetItem(seed, itemLevel, random) : rollStandardItem(seed, rarity, itemLevel, random);
+  const item = rollItem(seed, rarity, itemLevel, random);
   const goldBonus = rollInteger(level.chest.goldBonus.min, level.chest.goldBonus.max, random);
 
   return {
@@ -66,6 +65,18 @@ export function rollRarity(weights: Record<LootRarity, number>, random: () => nu
   return entries.at(-1)?.[0] ?? "common";
 }
 
+function rollItem(seed: number, rarity: LootRarity, itemLevel: number, random: () => number): Omit<LootItem, "modifiers"> {
+  if (rarity === "set") {
+    return rollSetItem(seed, itemLevel, random);
+  }
+
+  if (rarity === "legendary") {
+    return rollLegendaryItem(seed, itemLevel, random);
+  }
+
+  return rollStandardItem(seed, rarity, itemLevel, random);
+}
+
 function rollStandardItem(
   seed: number,
   rarity: LootRarity,
@@ -79,6 +90,18 @@ function rollStandardItem(
     name: `${lootRarities[rarity].label} ${baseItem.name}`,
     rarity,
     slot: baseItem.slot,
+    itemLevel,
+  };
+}
+
+function rollLegendaryItem(seed: number, itemLevel: number, random: () => number): Omit<LootItem, "modifiers"> {
+  const legendaryItem = pickOne(legendaryLootItems, random);
+
+  return {
+    id: `${seed}-${legendaryItem.id}`,
+    name: legendaryItem.name,
+    rarity: "legendary",
+    slot: legendaryItem.slot,
     itemLevel,
   };
 }

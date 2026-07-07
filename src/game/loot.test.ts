@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { heroClasses, starterLevel } from "./content";
+import { heroClasses, legendaryLootItems, lootSets, starterLevel } from "./content";
 import { generateChestReward, rollRarity } from "./loot";
 import type { LevelDefinition, LootRarity } from "./types";
 
@@ -35,9 +35,28 @@ describe("loot", () => {
       },
     };
     const reward = generateChestReward(heroClasses[1], setOnlyLevel, 0);
+    const setNames = lootSets.map((set) => set.name);
+    const pieceNames = lootSets.flatMap((set) => set.pieces.map((piece) => piece.name));
 
     expect(reward.item.rarity).toBe("set");
-    expect(reward.item.setName).toBe("Bone Gate Regalia");
+    expect(setNames).toContain(reward.item.setName);
+    expect(pieceNames).toContain(reward.item.name);
+  });
+
+  it("uses curated hidden-reference names for legendary items", () => {
+    const legendaryOnlyLevel: LevelDefinition = {
+      ...starterLevel,
+      chest: {
+        ...starterLevel.chest,
+        rarityWeights: { ...zeroWeights, legendary: 1 },
+      },
+    };
+    const reward = generateChestReward(heroClasses[3], legendaryOnlyLevel, 0);
+    const legendaryNames = legendaryLootItems.map((item) => item.name);
+
+    expect(reward.item.rarity).toBe("legendary");
+    expect(legendaryNames).toContain(reward.item.name);
+    expect(reward.item.name).not.toMatch(/ring|throne|witcher|jedi|sith|skywalker|lucille/i);
   });
 
   it("scales item modifiers with completed level item level", () => {

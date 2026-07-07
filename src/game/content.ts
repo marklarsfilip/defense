@@ -4,6 +4,7 @@ import type {
   LevelDefinition,
   LootAffixDefinition,
   LootBaseItemDefinition,
+  LootNamedItemDefinition,
   LootRarity,
   LootRarityDefinition,
   LootSetDefinition,
@@ -209,6 +210,16 @@ export const lootBaseItems: LootBaseItemDefinition[] = [
   { id: "gate-ring", name: "Gate Ring", slot: "trinket" },
 ];
 
+export const legendaryLootItems: LootNamedItemDefinition[] = [
+  { id: "westering-ember-shard", name: "Westering Ember Shard", slot: "weapon" },
+  { id: "blackwall-oathblade", name: "Blackwall Oathblade", slot: "weapon" },
+  { id: "twin-moon-silverbrand", name: "Twin-Moon Silverbrand", slot: "weapon" },
+  { id: "pale-road-badge", name: "Pale Road Badge", slot: "trinket" },
+  { id: "void-hum-resonator", name: "Void-Hum Resonator", slot: "weapon" },
+  { id: "ashen-contract-medallion", name: "Ashen Contract Medallion", slot: "trinket" },
+  { id: "last-watch-longcoat", name: "Last Watch Longcoat", slot: "armor" },
+];
+
 export const lootAffixes: LootAffixDefinition[] = [
   { id: "brutal", name: "Brutal", stat: "damage", minPerLevel: 1.7, maxPerLevel: 3.4 },
   { id: "sturdy", name: "Sturdy", stat: "health", minPerLevel: 7, maxPerLevel: 14 },
@@ -222,12 +233,48 @@ export const lootAffixes: LootAffixDefinition[] = [
 
 export const lootSets: LootSetDefinition[] = [
   {
-    id: "bone-gate",
-    name: "Bone Gate Regalia",
+    id: "ninefold-road",
+    name: "Ninefold Road Relics",
     pieces: [
-      { name: "Gatekeeper Splitter", slot: "weapon" },
-      { name: "Ribguard Harness", slot: "armor" },
-      { name: "Marrow Signet", slot: "trinket" },
+      { name: "Wayfarer's Ember Cutter", slot: "weapon" },
+      { name: "Grey Road Mantle", slot: "armor" },
+      { name: "Small Golden Burden", slot: "trinket" },
+    ],
+  },
+  {
+    id: "black-ice-vigil",
+    name: "Black Ice Vigil",
+    pieces: [
+      { name: "Crowless Watchblade", slot: "weapon" },
+      { name: "Frost-Vow Harness", slot: "armor" },
+      { name: "Northern Ember Seal", slot: "trinket" },
+    ],
+  },
+  {
+    id: "pale-contract",
+    name: "Pale Contract Gear",
+    pieces: [
+      { name: "Two-Moon Silver Fang", slot: "weapon" },
+      { name: "Potion-Stained Jerkin", slot: "armor" },
+      { name: "Monster Ledger Charm", slot: "trinket" },
+    ],
+  },
+  {
+    id: "last-road",
+    name: "Last Road Keepsakes",
+    pieces: [
+      { name: "Barbed Lullaby Token", slot: "trinket" },
+      { name: "Fenced County Leathers", slot: "armor" },
+      { name: "Roadhouse Cleaver", slot: "weapon" },
+    ],
+  },
+  {
+    id: "far-star",
+    name: "Far-Star Relics",
+    pieces: [
+      { name: "Humming Lightrod", slot: "weapon" },
+      { name: "Twin-Sun Desert Wrap", slot: "armor" },
+      { name: "Rebel Spark Cell", slot: "trinket" },
     ],
   },
 ];
