@@ -5,14 +5,18 @@ import { heroClasses } from "./game/content";
 import { createBonusLevel, createCampaignLevel, shouldQueueBonusLevel } from "./game/levels";
 import { applyEquipmentToHero } from "./game/equipment";
 import { rollShopStock, getRerollCost } from "./game/shop";
+import { applyAllocationToHero, ALLOCATABLE_STATS, getStatPointBudget, getAllocatedPointCount } from "./game/allocation";
 import {
+  allocateStat,
   applyCombatRewards,
   buyShopOffer,
   createInitialCampaign,
+  deallocateStat,
   equipFromInventory,
   getExperienceForNextLevel,
   learnCampaignTalent,
   rerollShop,
+  resetAllocation,
   restoreCampaign,
   salvageItem,
   selectCampaignClass,
@@ -36,8 +40,12 @@ export function App() {
     [campaign.selectedClassId],
   );
   const effectiveHero = useMemo(
-    () => applyEquipmentToHero(applyTalentsToHero(selectedClass, campaign.selectedTalentIds), campaign.equipment),
-    [selectedClass, campaign.selectedTalentIds, campaign.equipment],
+    () =>
+      applyEquipmentToHero(
+        applyAllocationToHero(applyTalentsToHero(selectedClass, campaign.selectedTalentIds), campaign.statAllocation),
+        campaign.equipment,
+      ),
+    [selectedClass, campaign.selectedTalentIds, campaign.statAllocation, campaign.equipment],
   );
   const shopOffers = useMemo(
     () => rollShopStock(campaign.heroLevel, campaign.shopRerolls),
@@ -58,6 +66,9 @@ export function App() {
   const experienceProgress =
     experienceForNextLevel > 0 ? Math.min(100, Math.round((campaign.experience / experienceForNextLevel) * 100)) : 100;
   const currentLevelCompleted = campaign.completedLevelIds.includes(currentLevel.id);
+  const statBudget = getStatPointBudget(campaign.heroLevel);
+  const pointsSpent = getAllocatedPointCount(campaign.statAllocation);
+  const pointsRemaining = statBudget - pointsSpent;
 
   useEffect(() => {
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(campaign));
@@ -116,6 +127,16 @@ export function App() {
 
   function reroll() {
     setCampaign((current) => rerollShop(current));
+  }
+
+  function addPoint(stat: (typeof ALLOCATABLE_STATS)[number]) {
+    setCampaign((current) => allocateStat(current, stat));
+  }
+  function removePoint(stat: (typeof ALLOCATABLE_STATS)[number]) {
+    setCampaign((current) => deallocateStat(current, stat));
+  }
+  function resetPoints() {
+    setCampaign((current) => resetAllocation(current));
   }
 
   return (
@@ -246,6 +267,34 @@ export function App() {
               ))}
               {availableTalents.length === 0 ? <p>No talent choices unlocked yet.</p> : null}
             </div>
+          </div>
+
+          <div className="allocation-panel" aria-label="Stat points">
+            <div className="progress-row">
+              <span>Stat points</span>
+              <strong>{pointsRemaining} left</strong>
+            </div>
+            <div className="allocation-list">
+              {ALLOCATABLE_STATS.map((stat) => (
+                <div className="allocation-row" key={stat}>
+                  <span>{stat}</span>
+                  <div className="allocation-controls">
+                    <button disabled={campaign.statAllocation[stat] <= 0} onClick={() => removePoint(stat)} type="button">
+                      −
+                    </button>
+                    <strong>{campaign.statAllocation[stat]}</strong>
+                    <button disabled={pointsRemaining <= 0} onClick={() => addPoint(stat)} type="button">
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {pointsSpent > 0 ? (
+              <button className="text-action" onClick={resetPoints} type="button">
+                Reset points
+              </button>
+            ) : null}
           </div>
 
           <button className="primary-action" onClick={startLevel} type="button">

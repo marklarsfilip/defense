@@ -670,3 +670,45 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+.allocation-panel {
+  border-top: 1px solid #2b303c;
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.allocation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.allocation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-transform: capitalize;
+  font-size: 13px;
+}
+
+.allocation-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.allocation-controls button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid #2b303c;
+  background: #1b1f27;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.allocation-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
