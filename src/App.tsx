@@ -3,26 +3,33 @@ import { Coins, Play, RotateCcw, Save, Sparkles, Trophy, Zap } from "lucide-reac
 import { CombatReplay } from "./components/CombatReplay";
 import { heroClasses } from "./game/content";
 import { createBonusLevel, createCampaignLevel, shouldQueueBonusLevel } from "./game/levels";
-import { applyEquipmentToHero } from "./game/equipment";
+import { applyEquipmentToHero, getActiveSetBonuses } from "./game/equipment";
 import { rollShopStock, getRerollCost } from "./game/shop";
+import { upgradeCost, rerollCost, canUpgrade } from "./game/upgrade";
+import { applyAllocationToHero, ALLOCATABLE_STATS, getStatPointBudget, getAllocatedPointCount } from "./game/allocation";
 import {
+  allocateStat,
   applyCombatRewards,
   buyShopOffer,
   createInitialCampaign,
+  deallocateStat,
   equipFromInventory,
   getExperienceForNextLevel,
   learnCampaignTalent,
   rerollShop,
+  resetAllocation,
   restoreCampaign,
+  rerollItemById,
   salvageItem,
   selectCampaignClass,
   unequipToInventory,
+  upgradeItemById,
   type CampaignState,
 } from "./game/progression";
-import { generateChestReward } from "./game/loot";
+import { formatModifierValue, generateChestReward } from "./game/loot";
 import { simulateCombat } from "./game/simulateCombat";
 import { applyTalentsToHero, getAvailableTalents, getSelectedTalents, getTalentPointBudget } from "./game/talents";
-import type { ChestReward, CombatResult, EquipmentSlot } from "./game/types";
+import type { ChestReward, CombatResult, EquipmentSlot, StatKey } from "./game/types";
 
 const SAVE_KEY = "tbd-defense:campaign";
 
@@ -36,14 +43,18 @@ export function App() {
     [campaign.selectedClassId],
   );
   const effectiveHero = useMemo(
-    () => applyEquipmentToHero(applyTalentsToHero(selectedClass, campaign.selectedTalentIds), campaign.equipment),
-    [selectedClass, campaign.selectedTalentIds, campaign.equipment],
+    () =>
+      applyEquipmentToHero(
+        applyAllocationToHero(applyTalentsToHero(selectedClass, campaign.selectedTalentIds), campaign.statAllocation),
+        campaign.equipment,
+      ),
+    [selectedClass, campaign.selectedTalentIds, campaign.statAllocation, campaign.equipment],
   );
   const shopOffers = useMemo(
     () => rollShopStock(campaign.heroLevel, campaign.shopRerolls),
     [campaign.heroLevel, campaign.shopRerolls],
   );
-  const rerollCost = getRerollCost(campaign.shopRerolls);
+  const shopRerollCost = getRerollCost(campaign.shopRerolls);
   const talentPointBudget = getTalentPointBudget(campaign.heroLevel);
   const availableTalents = getAvailableTalents(campaign.heroLevel, campaign.selectedClassId, campaign.selectedTalentIds);
   const selectedTalents = getSelectedTalents(campaign.selectedTalentIds);
@@ -58,6 +69,10 @@ export function App() {
   const experienceProgress =
     experienceForNextLevel > 0 ? Math.min(100, Math.round((campaign.experience / experienceForNextLevel) * 100)) : 100;
   const currentLevelCompleted = campaign.completedLevelIds.includes(currentLevel.id);
+  const statBudget = getStatPointBudget(campaign.heroLevel);
+  const pointsSpent = getAllocatedPointCount(campaign.statAllocation);
+  const pointsRemaining = statBudget - pointsSpent;
+  const activeSetBonuses = useMemo(() => getActiveSetBonuses(campaign.equipment), [campaign.equipment]);
 
   useEffect(() => {
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(campaign));
@@ -110,12 +125,46 @@ export function App() {
     setCampaign((current) => salvageItem(current, itemId));
   }
 
+  function upgradeItemAction(itemId: string) {
+    setCampaign((current) => upgradeItemById(current, itemId));
+  }
+  function rerollItemAction(itemId: string) {
+    setCampaign((current) => rerollItemById(current, itemId));
+  }
+
   function buy(offer: (typeof shopOffers)[number]) {
     setCampaign((current) => buyShopOffer(current, offer));
   }
 
   function reroll() {
     setCampaign((current) => rerollShop(current));
+  }
+
+  function addPoint(stat: (typeof ALLOCATABLE_STATS)[number]) {
+    setCampaign((current) => allocateStat(current, stat));
+  }
+  function removePoint(stat: (typeof ALLOCATABLE_STATS)[number]) {
+    setCampaign((current) => deallocateStat(current, stat));
+  }
+  function resetPoints() {
+    setCampaign((current) => resetAllocation(current));
+  }
+
+  function itemUpgradeControls(item: (typeof campaign.inventory)[number]) {
+    return (
+      <div className="item-actions">
+        <button
+          disabled={!canUpgrade(item) || campaign.gold < upgradeCost(item)}
+          onClick={() => upgradeItemAction(item.id)}
+          type="button"
+        >
+          {canUpgrade(item) ? `Upgrade (${upgradeCost(item)}g)` : "Max"}
+        </button>
+        <button disabled={campaign.gold < rerollCost(item)} onClick={() => rerollItemAction(item.id)} type="button">
+          Reroll ({rerollCost(item)}g)
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -248,6 +297,34 @@ export function App() {
             </div>
           </div>
 
+          <div className="allocation-panel" aria-label="Stat points">
+            <div className="progress-row">
+              <span>Stat points</span>
+              <strong>{pointsRemaining} left</strong>
+            </div>
+            <div className="allocation-list">
+              {ALLOCATABLE_STATS.map((stat) => (
+                <div className="allocation-row" key={stat}>
+                  <span>{stat}</span>
+                  <div className="allocation-controls">
+                    <button disabled={campaign.statAllocation[stat] <= 0} onClick={() => removePoint(stat)} type="button">
+                      −
+                    </button>
+                    <strong>{campaign.statAllocation[stat]}</strong>
+                    <button disabled={pointsRemaining <= 0} onClick={() => addPoint(stat)} type="button">
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {pointsSpent > 0 ? (
+              <button className="text-action" onClick={resetPoints} type="button">
+                Reset points
+              </button>
+            ) : null}
+          </div>
+
           <button className="primary-action" onClick={startLevel} type="button">
             <Play size={18} />
             Start {currentLevel.name}
@@ -377,6 +454,8 @@ export function App() {
                           <li key={`${item.id}-${modifier.stat}`}>{modifier.label}</li>
                         ))}
                       </ul>
+                      {item.upgradeLevel ? <span className="upgrade-badge">+{item.upgradeLevel}</span> : null}
+                      {itemUpgradeControls(item)}
                       <button className="text-action" onClick={() => unequip(slot)} type="button">
                         Unequip
                       </button>
@@ -388,6 +467,23 @@ export function App() {
               );
             })}
           </div>
+
+          {activeSetBonuses.length > 0 ? (
+            <div className="set-bonuses" aria-label="Active set bonuses">
+              <p className="eyebrow">Set bonuses</p>
+              {activeSetBonuses.map((bonus) => (
+                <div className="set-bonus-row" key={bonus.setId}>
+                  <strong>{bonus.setName}</strong>
+                  <span>
+                    {bonus.pieces}-piece bonus:{" "}
+                    {Object.entries(bonus.modifiers)
+                      .map(([stat, value]) => formatModifierValue(stat as StatKey, value as number))
+                      .join(", ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </aside>
 
         <aside className="panel inventory-panel" aria-label="Inventory">
@@ -416,6 +512,8 @@ export function App() {
                     <li key={`${item.id}-${modifier.stat}`}>{modifier.label}</li>
                   ))}
                 </ul>
+                {item.upgradeLevel ? <span className="upgrade-badge">+{item.upgradeLevel}</span> : null}
+                {itemUpgradeControls(item)}
                 <div className="inventory-actions">
                   <button className="secondary-action" onClick={() => equip(item.id)} type="button">
                     Equip
@@ -436,11 +534,11 @@ export function App() {
           </div>
           <button
             className="secondary-action"
-            disabled={campaign.gold < rerollCost}
+            disabled={campaign.gold < shopRerollCost}
             onClick={reroll}
             type="button"
           >
-            Reroll stock ({rerollCost} gold)
+            Reroll stock ({shopRerollCost} gold)
           </button>
           <div className="shop-list">
             {shopOffers.map((offer) => (

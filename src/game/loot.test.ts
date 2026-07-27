@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { heroClasses, legendaryLootItems, lootSets, starterLevel } from "./content";
-import { generateChestReward, generateLootItem, rollRarity } from "./loot";
+import { formatModifierValue, generateChestReward, generateLootItem, quantizeModifierAmount, rollItemModifiers, rollRarity } from "./loot";
 import type { LevelDefinition, LootRarity } from "./types";
 
 const zeroWeights: Record<LootRarity, number> = {
@@ -100,5 +100,37 @@ describe("generateLootItem", () => {
 
   it("respects rarity weights", () => {
     expect(generateLootItem(999, ALL_RARE, 5).rarity).toBe("rare");
+  });
+});
+
+describe("rollItemModifiers", () => {
+  it("is deterministic for the same seed and yields the rarity's modifier count", () => {
+    const a = rollItemModifiers("rare", 5, 4242);
+    const b = rollItemModifiers("rare", 5, 4242);
+    expect(a).toEqual(b);
+    expect(a).toHaveLength(2); // rare => modifierCount 2
+  });
+
+  it("varies with the seed", () => {
+    const a = rollItemModifiers("rare", 5, 1);
+    const b = rollItemModifiers("rare", 5, 2);
+    expect(a).not.toEqual(b);
+  });
+});
+
+describe("quantizeModifierAmount", () => {
+  it("floors flat stats at 1 integer", () => {
+    expect(quantizeModifierAmount("damage", 0.2)).toBe(1);
+    expect(quantizeModifierAmount("damage", 7.6)).toBe(8);
+  });
+  it("keeps percent stats as rounded fractions", () => {
+    expect(quantizeModifierAmount("critChance", 0.12345)).toBe(0.123);
+  });
+});
+
+describe("formatModifierValue", () => {
+  it("formats flat and percent stats", () => {
+    expect(formatModifierValue("damage", 8)).toContain("8");
+    expect(formatModifierValue("critChance", 0.15)).toContain("%");
   });
 });

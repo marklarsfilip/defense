@@ -3,6 +3,7 @@ import {
   EMPTY_EQUIPMENT,
   applyEquipmentToHero,
   autoEquipIfBetter,
+  getActiveSetBonuses,
   itemPowerScore,
   salvageValue,
 } from "./equipment";
@@ -85,5 +86,59 @@ describe("salvageValue", () => {
     const low: LootItem = { ...weapon("x", 1), rarity: "rare", itemLevel: 2 };
     const high: LootItem = { ...weapon("y", 1), rarity: "rare", itemLevel: 8 };
     expect(salvageValue(high)).toBeGreaterThan(salvageValue(low));
+  });
+});
+
+function setPiece(id: string, slot: LootItem["slot"], setId: string): LootItem {
+  return { id, name: `${setId} ${slot}`, rarity: "set", slot, itemLevel: 5, modifiers: [], setId, setName: "Ninefold Road Relics" };
+}
+
+describe("set bonuses", () => {
+  it("no bonus with fewer than 2 set pieces", () => {
+    const eq = { ...EMPTY_EQUIPMENT, weapon: setPiece("w", "weapon", "ninefold-road") };
+    expect(getActiveSetBonuses(eq)).toHaveLength(0);
+  });
+
+  it("2-piece bonus at 2 matching pieces, 3-piece at 3", () => {
+    const two = { ...EMPTY_EQUIPMENT, weapon: setPiece("w", "weapon", "ninefold-road"), armor: setPiece("a", "armor", "ninefold-road") };
+    const bonuses2 = getActiveSetBonuses(two);
+    expect(bonuses2).toHaveLength(1);
+    expect(bonuses2[0].tier).toBe(2);
+
+    const three = { ...two, trinket: setPiece("t", "trinket", "ninefold-road") };
+    expect(getActiveSetBonuses(three)[0].tier).toBe(3);
+  });
+
+  it("folds the set bonus into hero stats via applyEquipmentToHero", () => {
+    const two = { ...EMPTY_EQUIPMENT, weapon: setPiece("w", "weapon", "ninefold-road"), armor: setPiece("a", "armor", "ninefold-road") };
+    const hero = applyEquipmentToHero(berserker, two);
+    // ninefold-road 2pc = { armor: 4, health: 30 }; set pieces above have no item modifiers
+    expect(hero.stats.armor).toBe(berserker.stats.armor + 4);
+    expect(hero.stats.health).toBe(berserker.stats.health + 30);
+  });
+
+  it("folds the 3-piece set bonus into hero stats", () => {
+    const three = {
+      ...EMPTY_EQUIPMENT,
+      weapon: setPiece("w", "weapon", "ninefold-road"),
+      armor: setPiece("a", "armor", "ninefold-road"),
+      trinket: setPiece("t", "trinket", "ninefold-road"),
+    };
+    const hero = applyEquipmentToHero(berserker, three);
+    // ninefold-road 3pc = { armor: 8, health: 70, damage: 6 }
+    expect(hero.stats.armor).toBe(berserker.stats.armor + 8);
+    expect(hero.stats.health).toBe(berserker.stats.health + 70);
+    expect(hero.stats.damage).toBe(berserker.stats.damage + 6);
+  });
+
+  it("clamps critChance at 0.95 when set bonus + item mods exceed the cap", () => {
+    const bigCrit = (id: string, slot: LootItem["slot"]) => ({
+      id, name: `bic ${slot}`, rarity: "set" as const, slot, itemLevel: 5,
+      modifiers: [{ stat: "critChance" as const, label: "Precise: +80% critical chance", amount: 0.8 }],
+      setId: "black-ice-vigil", setName: "Black Ice Vigil",
+    });
+    const eq = { ...EMPTY_EQUIPMENT, weapon: bigCrit("w", "weapon"), armor: bigCrit("a", "armor"), trinket: bigCrit("t", "trinket") };
+    const hero = applyEquipmentToHero(berserker, eq);
+    expect(hero.stats.critChance).toBe(0.95);
   });
 });

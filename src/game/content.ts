@@ -8,6 +8,7 @@ import type {
   LootRarity,
   LootRarityDefinition,
   LootSetDefinition,
+  SetBonus,
   TalentDefinition,
 } from "./types";
 import { createCampaignLevel } from "./levels";
@@ -386,6 +387,14 @@ export const lootSets: LootSetDefinition[] = [
     ],
   },
 ];
+
+export const setBonuses: Record<string, SetBonus> = {
+  "ninefold-road": { two: { armor: 4, health: 30 }, three: { armor: 8, health: 70, damage: 6 } },
+  "black-ice-vigil": { two: { critChance: 0.04, critDamage: 0.1 }, three: { critChance: 0.08, critDamage: 0.25, damage: 5 } },
+  "pale-contract": { two: { damage: 6 }, three: { damage: 14, attackSpeed: 0.08 } },
+  "last-road": { two: { attackSpeed: 0.06 }, three: { attackSpeed: 0.14, damage: 6 } },
+  "far-star": { two: { abilityPower: 10 }, three: { abilityPower: 24, cooldownReduction: 0.06 } },
+};
 
 export const talents: TalentDefinition[] = [
   {

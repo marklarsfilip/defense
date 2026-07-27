@@ -1,18 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { heroClasses, starterLevel } from "./content";
 import {
+  allocateStat,
   applyCombatRewards,
   buyShopOffer,
   createInitialCampaign,
+  deallocateStat,
   equipFromInventory,
   getExperienceForNextLevel,
   learnCampaignTalent,
+  rerollItemById,
   rerollShop,
+  resetAllocation,
   restoreCampaign,
   salvageItem,
   selectCampaignClass,
   unequipToInventory,
+  upgradeItemById,
 } from "./progression";
+import { getStatPointBudget } from "./allocation";
+import { upgradeCost, rerollCost, MAX_UPGRADE_LEVEL } from "./upgrade";
 import { salvageValue } from "./equipment";
 import type { CombatResult, LootItem, ShopOffer } from "./types";
 
@@ -299,6 +306,116 @@ describe("shop reducers", () => {
   it("no-ops a reroll the player cannot afford", () => {
     const base = { ...createInitialCampaign(), gold: 5 };
     expect(rerollShop(base)).toBe(base);
+  });
+});
+
+describe("stat allocation migration", () => {
+  it("initializes an empty allocation", () => {
+    expect(createInitialCampaign().statAllocation).toEqual({ health: 0, damage: 0, armor: 0, abilityPower: 0, critChance: 0 });
+  });
+
+  it("restores and sanitizes allocation, dropping unknown keys and clamping to budget", () => {
+    const restored = restoreCampaign({
+      heroLevel: 3, // budget = (3-1)*2 = 4
+      statAllocation: { damage: 3, health: 10, bogus: 5, armor: -2 },
+    });
+    const a = restored.statAllocation;
+    expect(a.armor).toBe(0); // negative floored
+    expect(Object.keys(a).sort()).toEqual(["abilityPower", "armor", "critChance", "damage", "health"]); // no 'bogus'
+    expect(a.damage + a.health + a.armor + a.abilityPower + a.critChance).toBeLessThanOrEqual(4); // clamped to budget
+  });
+
+  it("defaults allocation for an old save without the field", () => {
+    expect(restoreCampaign({ gold: 5 }).statAllocation).toEqual({ health: 0, damage: 0, armor: 0, abilityPower: 0, critChance: 0 });
+  });
+
+  it("drops a persisted item whose upgradeLevel is not a number", () => {
+    const restored = restoreCampaign({
+      inventory: [{ id: "z", name: "Bad", rarity: "rare", slot: "weapon", itemLevel: 3, modifiers: [], upgradeLevel: "3" }],
+    });
+    expect(restored.inventory).toHaveLength(0);
+  });
+
+  it("drops a persisted item whose rerolls is not a number", () => {
+    const restored = restoreCampaign({
+      inventory: [{ id: "z", name: "Bad", rarity: "rare", slot: "weapon", itemLevel: 3, modifiers: [], rerolls: "2" }],
+    });
+    expect(restored.inventory).toHaveLength(0);
+  });
+
+  it("preserves a within-budget allocation unchanged", () => {
+    const allocation = { health: 2, damage: 1, armor: 0, abilityPower: 0, critChance: 0 };
+    // budget at level 10 is (10-1)*2 = 18, so nothing is trimmed.
+    expect(restoreCampaign({ heroLevel: 10, statAllocation: allocation }).statAllocation).toEqual(allocation);
+  });
+
+  it("trims later stats before earlier ones when over budget", () => {
+    // heroLevel 2 => budget 2. Total allocated is 10, so 8 must be trimmed from the end first.
+    const restored = restoreCampaign({
+      heroLevel: 2,
+      statAllocation: { health: 5, damage: 0, armor: 0, abilityPower: 0, critChance: 5 },
+    });
+    expect(restored.statAllocation.health).toBe(2);
+    expect(restored.statAllocation.critChance).toBe(0);
+  });
+});
+
+describe("allocation reducers", () => {
+  it("allocates up to budget then no-ops", () => {
+    let s = { ...createInitialCampaign(), heroLevel: 2 }; // budget = 2
+    s = allocateStat(s, "damage");
+    s = allocateStat(s, "damage");
+    expect(s.statAllocation.damage).toBe(2);
+    const capped = allocateStat(s, "health");
+    expect(capped).toBe(s); // budget exhausted -> no-op identity
+  });
+
+  it("deallocates with a floor of 0", () => {
+    let s = { ...createInitialCampaign(), heroLevel: 4, statAllocation: { ...createInitialCampaign().statAllocation, armor: 1 } };
+    s = deallocateStat(s, "armor");
+    expect(s.statAllocation.armor).toBe(0);
+    expect(deallocateStat(s, "armor")).toBe(s); // already 0 -> no-op
+  });
+
+  it("resets all allocation to 0", () => {
+    const s = { ...createInitialCampaign(), heroLevel: 6, statAllocation: { health: 2, damage: 1, armor: 0, abilityPower: 0, critChance: 0 } };
+    expect(resetAllocation(s).statAllocation).toEqual({ health: 0, damage: 0, armor: 0, abilityPower: 0, critChance: 0 });
+  });
+});
+
+describe("upgrade / reroll reducers", () => {
+  it("upgrades an equipped item, deducting gold and bumping upgradeLevel", () => {
+    const weapon = makeItem("w1", 10);
+    const base = { ...createInitialCampaign(), gold: 100000, equipment: { weapon, armor: null, trinket: null } };
+    const cost = upgradeCost(weapon);
+    const next = upgradeItemById(base, "w1");
+    expect(next.gold).toBe(100000 - cost);
+    expect(next.equipment.weapon?.upgradeLevel).toBe(1);
+  });
+
+  it("rerolls an inventory item, deducting gold and incrementing rerolls", () => {
+    const it = makeItem("inv1", 8);
+    const base = { ...createInitialCampaign(), gold: 100000, inventory: [it] };
+    const cost = rerollCost(it);
+    const next = rerollItemById(base, "inv1");
+    expect(next.gold).toBe(100000 - cost);
+    expect(next.inventory[0].rerolls).toBe(1);
+  });
+
+  it("no-ops upgrade when unaffordable, item missing, or at cap", () => {
+    const poor = { ...createInitialCampaign(), gold: 0, inventory: [makeItem("x", 5)] };
+    expect(upgradeItemById(poor, "x")).toBe(poor);
+    const rich = { ...poor, gold: 100000 };
+    expect(upgradeItemById(rich, "missing")).toBe(rich);
+    const maxed = { ...createInitialCampaign(), gold: 100000, inventory: [{ ...makeItem("m", 5), upgradeLevel: MAX_UPGRADE_LEVEL }] };
+    expect(upgradeItemById(maxed, "m")).toBe(maxed);
+  });
+
+  it("no-ops reroll when unaffordable or item missing", () => {
+    const poor = { ...createInitialCampaign(), gold: 0, inventory: [makeItem("r", 5)] };
+    expect(rerollItemById(poor, "r")).toBe(poor); // can't afford
+    const rich = { ...poor, gold: 100000 };
+    expect(rerollItemById(rich, "missing")).toBe(rich); // not found
   });
 });
 

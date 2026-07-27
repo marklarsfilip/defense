@@ -21,6 +21,8 @@ export type EquipmentSlot = "weapon" | "armor" | "trinket";
 
 export type StatKey = keyof Stats;
 
+export type AllocatableStat = "health" | "damage" | "armor" | "abilityPower" | "critChance";
+
 export interface Stats {
   health: number;
   armor: number;
@@ -147,6 +149,11 @@ export interface LootSetDefinition {
   }>;
 }
 
+export interface SetBonus {
+  two: Partial<Stats>;
+  three: Partial<Stats>;
+}
+
 export interface LootModifier {
   stat: StatKey;
   label: string;
@@ -160,6 +167,8 @@ export interface LootItem {
   slot: EquipmentSlot;
   itemLevel: number;
   modifiers: LootModifier[];
+  upgradeLevel?: number;
+  rerolls?: number;
   setId?: string;
   setName?: string;
 }
