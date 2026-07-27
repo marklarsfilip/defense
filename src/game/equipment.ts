@@ -1,5 +1,6 @@
+import { setBonuses } from "./content";
 import { applyStatModifiers } from "./stats";
-import type { Equipment, HeroClass, LootItem, LootRarity, StatKey } from "./types";
+import type { Equipment, HeroClass, LootItem, LootRarity, Stats, StatKey } from "./types";
 
 export const EMPTY_EQUIPMENT: Equipment = { weapon: null, armor: null, trinket: null };
 
@@ -30,6 +31,39 @@ export interface AutoEquipResult {
   equipped: boolean;
 }
 
+export interface ActiveSetBonus {
+  setId: string;
+  setName: string;
+  pieces: number;
+  tier: 2 | 3;
+  modifiers: Partial<Stats>;
+}
+
+export function getActiveSetBonuses(equipment: Equipment): ActiveSetBonus[] {
+  const counts = new Map<string, { setName: string; pieces: number }>();
+
+  for (const item of [equipment.weapon, equipment.armor, equipment.trinket]) {
+    if (!item?.setId) {
+      continue;
+    }
+    const current = counts.get(item.setId) ?? { setName: item.setName ?? item.setId, pieces: 0 };
+    current.pieces += 1;
+    counts.set(item.setId, current);
+  }
+
+  const active: ActiveSetBonus[] = [];
+  for (const [setId, { setName, pieces }] of counts) {
+    const definition = setBonuses[setId];
+    if (!definition || pieces < 2) {
+      continue;
+    }
+    const tier: 2 | 3 = pieces >= 3 ? 3 : 2;
+    active.push({ setId, setName, pieces, tier, modifiers: tier === 3 ? definition.three : definition.two });
+  }
+
+  return active;
+}
+
 export function applyEquipmentToHero(heroClass: HeroClass, equipment: Equipment): HeroClass {
   const equipped = [equipment.weapon, equipment.armor, equipment.trinket].filter(
     (item): item is LootItem => item !== null,
@@ -38,7 +72,7 @@ export function applyEquipmentToHero(heroClass: HeroClass, equipment: Equipment)
   // Applied one modifier at a time to preserve additivity through applyStatModifiers.
   // Correct as long as modifiers are non-negative: incremental clamping then equals
   // clamping the summed total. Revisit if penalty/negative affixes are ever added.
-  const stats = equipped.reduce(
+  let stats = equipped.reduce(
     (current, item) =>
       item.modifiers.reduce(
         (accumulated, modifier) => applyStatModifiers(accumulated, { [modifier.stat]: modifier.amount }),
@@ -46,6 +80,10 @@ export function applyEquipmentToHero(heroClass: HeroClass, equipment: Equipment)
       ),
     heroClass.stats,
   );
+
+  for (const bonus of getActiveSetBonuses(equipment)) {
+    stats = applyStatModifiers(stats, bonus.modifiers);
+  }
 
   return { ...heroClass, stats };
 }

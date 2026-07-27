@@ -149,6 +149,11 @@ export interface LootSetDefinition {
   }>;
 }
 
+export interface SetBonus {
+  two: Partial<Stats>;
+  three: Partial<Stats>;
+}
+
 export interface LootModifier {
   stat: StatKey;
   label: string;
