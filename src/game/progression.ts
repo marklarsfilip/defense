@@ -13,6 +13,7 @@ import { filterTalentIdsForClass, getTalentPointBudget } from "./talents";
 import { EMPTY_EQUIPMENT, autoEquipIfBetter, salvageValue } from "./equipment";
 import { getRerollCost } from "./shop";
 import { ALLOCATABLE_STATS, EMPTY_ALLOCATION, getAllocatedPointCount, getStatPointBudget, type StatAllocation } from "./allocation";
+import { canUpgrade, rerollCost, rerollItemModifiers, upgradeCost, upgradeItem } from "./upgrade";
 
 export interface CampaignState {
   selectedClassId: HeroClassId;
@@ -78,6 +79,79 @@ export function learnCampaignTalent(state: CampaignState, talentId: string): Cam
     ...state,
     selectedTalentIds: [...state.selectedTalentIds, talentId],
   };
+}
+
+export function allocateStat(state: CampaignState, stat: AllocatableStat): CampaignState {
+  if (getAllocatedPointCount(state.statAllocation) >= getStatPointBudget(state.heroLevel)) {
+    return state;
+  }
+  return {
+    ...state,
+    statAllocation: { ...state.statAllocation, [stat]: (state.statAllocation[stat] ?? 0) + 1 },
+  };
+}
+
+export function deallocateStat(state: CampaignState, stat: AllocatableStat): CampaignState {
+  if ((state.statAllocation[stat] ?? 0) <= 0) {
+    return state;
+  }
+  return {
+    ...state,
+    statAllocation: { ...state.statAllocation, [stat]: state.statAllocation[stat] - 1 },
+  };
+}
+
+export function resetAllocation(state: CampaignState): CampaignState {
+  return { ...state, statAllocation: { ...EMPTY_ALLOCATION } };
+}
+
+type ItemLocation =
+  | { source: "equipment"; slot: EquipmentSlot; item: LootItem }
+  | { source: "inventory"; index: number; item: LootItem };
+
+function locateItem(state: CampaignState, itemId: string): ItemLocation | null {
+  for (const slot of ["weapon", "armor", "trinket"] as EquipmentSlot[]) {
+    const item = state.equipment[slot];
+    if (item && item.id === itemId) {
+      return { source: "equipment", slot, item };
+    }
+  }
+  const index = state.inventory.findIndex((entry) => entry.id === itemId);
+  if (index >= 0) {
+    return { source: "inventory", index, item: state.inventory[index] };
+  }
+  return null;
+}
+
+function placeItem(state: CampaignState, location: ItemLocation, next: LootItem): CampaignState {
+  if (location.source === "equipment") {
+    return { ...state, equipment: { ...state.equipment, [location.slot]: next } };
+  }
+  return { ...state, inventory: state.inventory.map((entry, i) => (i === location.index ? next : entry)) };
+}
+
+export function upgradeItemById(state: CampaignState, itemId: string): CampaignState {
+  const location = locateItem(state, itemId);
+  if (!location || !canUpgrade(location.item)) {
+    return state;
+  }
+  const cost = upgradeCost(location.item);
+  if (state.gold < cost) {
+    return state;
+  }
+  return { ...placeItem(state, location, upgradeItem(location.item)), gold: state.gold - cost };
+}
+
+export function rerollItemById(state: CampaignState, itemId: string): CampaignState {
+  const location = locateItem(state, itemId);
+  if (!location) {
+    return state;
+  }
+  const cost = rerollCost(location.item);
+  if (state.gold < cost) {
+    return state;
+  }
+  return { ...placeItem(state, location, rerollItemModifiers(location.item)), gold: state.gold - cost };
 }
 
 export function equipFromInventory(state: CampaignState, itemId: string): CampaignState {
