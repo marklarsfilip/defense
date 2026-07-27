@@ -405,9 +405,17 @@ describe("upgrade / reroll reducers", () => {
   it("no-ops upgrade when unaffordable, item missing, or at cap", () => {
     const poor = { ...createInitialCampaign(), gold: 0, inventory: [makeItem("x", 5)] };
     expect(upgradeItemById(poor, "x")).toBe(poor);
-    expect(upgradeItemById({ ...poor, gold: 100000 }, "missing")).toEqual({ ...poor, gold: 100000 });
+    const rich = { ...poor, gold: 100000 };
+    expect(upgradeItemById(rich, "missing")).toBe(rich);
     const maxed = { ...createInitialCampaign(), gold: 100000, inventory: [{ ...makeItem("m", 5), upgradeLevel: MAX_UPGRADE_LEVEL }] };
     expect(upgradeItemById(maxed, "m")).toBe(maxed);
+  });
+
+  it("no-ops reroll when unaffordable or item missing", () => {
+    const poor = { ...createInitialCampaign(), gold: 0, inventory: [makeItem("r", 5)] };
+    expect(rerollItemById(poor, "r")).toBe(poor); // can't afford
+    const rich = { ...poor, gold: 100000 };
+    expect(rerollItemById(rich, "missing")).toBe(rich); // not found
   });
 });
 
