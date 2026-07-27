@@ -49,6 +49,22 @@ export function generateChestReward(
   };
 }
 
+export function generateLootItem(
+  seed: number,
+  rarityWeights: Record<LootRarity, number>,
+  itemLevel: number,
+): LootItem {
+  const random = createSeededRandom(seed);
+  const rarity = rollRarity(rarityWeights, random);
+  const rarityDefinition = lootRarities[rarity];
+  const base = rollItem(seed, rarity, itemLevel, random);
+
+  return {
+    ...base,
+    modifiers: rollModifiers(itemLevel, rarityDefinition.powerMultiplier, rarityDefinition.modifierCount, random),
+  };
+}
+
 export function rollRarity(weights: Record<LootRarity, number>, random: () => number): LootRarity {
   const entries = Object.entries(weights).filter(([, weight]) => weight > 0) as Array<[LootRarity, number]>;
   const totalWeight = entries.reduce((total, [, weight]) => total + weight, 0);

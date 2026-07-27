@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { heroClasses, legendaryLootItems, lootSets, starterLevel } from "./content";
-import { generateChestReward, rollRarity } from "./loot";
+import { generateChestReward, generateLootItem, rollRarity } from "./loot";
 import type { LevelDefinition, LootRarity } from "./types";
 
 const zeroWeights: Record<LootRarity, number> = {
@@ -10,6 +10,10 @@ const zeroWeights: Record<LootRarity, number> = {
   epic: 0,
   legendary: 0,
   set: 0,
+};
+
+const ALL_RARE: Record<LootRarity, number> = {
+  common: 0, uncommon: 0, rare: 1, epic: 0, legendary: 0, set: 0,
 };
 
 describe("loot", () => {
@@ -80,3 +84,21 @@ describe("loot", () => {
 function totalModifierPower(modifiers: Array<{ amount: number }>): number {
   return modifiers.reduce((total, modifier) => total + modifier.amount, 0);
 }
+
+describe("generateLootItem", () => {
+  it("is deterministic for the same seed", () => {
+    const a = generateLootItem(12345, ALL_RARE, 5);
+    const b = generateLootItem(12345, ALL_RARE, 5);
+    expect(a).toEqual(b);
+  });
+
+  it("produces different items for different seeds", () => {
+    const a = generateLootItem(1, ALL_RARE, 5);
+    const b = generateLootItem(2, ALL_RARE, 5);
+    expect(a.id).not.toBe(b.id);
+  });
+
+  it("respects rarity weights", () => {
+    expect(generateLootItem(999, ALL_RARE, 5).rarity).toBe("rare");
+  });
+});
