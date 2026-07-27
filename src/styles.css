@@ -596,3 +596,71 @@ button {
     flex-direction: column;
   }
 }
+
+.outfitting {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.equip-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.equip-slot {
+  border: 1px solid #2b303c;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.slot-label {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #8b93a7;
+}
+
+.slot-empty {
+  display: block;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.slot-item strong,
+.inventory-item strong,
+.shop-offer strong {
+  color: var(--rarity, #e5e7eb);
+}
+
+.inventory-list,
+.shop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.inventory-item,
+.shop-offer {
+  border: 1px solid #2b303c;
+  border-left: 3px solid var(--rarity, #2b303c);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.inventory-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (max-width: 960px) {
+  .outfitting {
+    grid-template-columns: 1fr;
+  }
+}

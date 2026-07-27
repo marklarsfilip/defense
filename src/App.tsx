@@ -3,13 +3,20 @@ import { Coins, Play, RotateCcw, Save, Sparkles, Trophy, Zap } from "lucide-reac
 import { CombatReplay } from "./components/CombatReplay";
 import { heroClasses } from "./game/content";
 import { createBonusLevel, createCampaignLevel, shouldQueueBonusLevel } from "./game/levels";
+import { applyEquipmentToHero } from "./game/equipment";
+import { rollShopStock, getRerollCost } from "./game/shop";
 import {
   applyCombatRewards,
+  buyShopOffer,
   createInitialCampaign,
+  equipFromInventory,
   getExperienceForNextLevel,
   learnCampaignTalent,
+  rerollShop,
   restoreCampaign,
+  salvageItem,
   selectCampaignClass,
+  unequipToInventory,
   type CampaignState,
 } from "./game/progression";
 import { generateChestReward } from "./game/loot";
@@ -29,9 +36,14 @@ export function App() {
     [campaign.selectedClassId],
   );
   const effectiveHero = useMemo(
-    () => applyTalentsToHero(selectedClass, campaign.selectedTalentIds),
-    [selectedClass, campaign.selectedTalentIds],
+    () => applyEquipmentToHero(applyTalentsToHero(selectedClass, campaign.selectedTalentIds), campaign.equipment),
+    [selectedClass, campaign.selectedTalentIds, campaign.equipment],
   );
+  const shopOffers = useMemo(
+    () => rollShopStock(campaign.heroLevel, campaign.shopRerolls),
+    [campaign.heroLevel, campaign.shopRerolls],
+  );
+  const rerollCost = getRerollCost(campaign.shopRerolls);
   const talentPointBudget = getTalentPointBudget(campaign.heroLevel);
   const availableTalents = getAvailableTalents(campaign.heroLevel, campaign.selectedClassId, campaign.selectedTalentIds);
   const selectedTalents = getSelectedTalents(campaign.selectedTalentIds);
@@ -84,6 +96,26 @@ export function App() {
 
   function learnTalent(talentId: string) {
     setCampaign((current) => learnCampaignTalent(current, talentId));
+  }
+
+  function equip(itemId: string) {
+    setCampaign((current) => equipFromInventory(current, itemId));
+  }
+
+  function unequip(slot: "weapon" | "armor" | "trinket") {
+    setCampaign((current) => unequipToInventory(current, slot));
+  }
+
+  function salvage(itemId: string) {
+    setCampaign((current) => salvageItem(current, itemId));
+  }
+
+  function buy(offer: (typeof shopOffers)[number]) {
+    setCampaign((current) => buyShopOffer(current, offer));
+  }
+
+  function reroll() {
+    setCampaign((current) => rerollShop(current));
   }
 
   return (
@@ -321,6 +353,125 @@ export function App() {
                   </li>
                 ))}
             </ol>
+          </div>
+        </aside>
+      </section>
+
+      <section className="outfitting" aria-label="Gear and economy">
+        <aside className="panel gear-panel" aria-label="Equipment">
+          <div className="panel-heading">
+            <p className="eyebrow">Loadout</p>
+            <h2>Equipment</h2>
+          </div>
+          <div className="equip-slots">
+            {(["weapon", "armor", "trinket"] as const).map((slot) => {
+              const item = campaign.equipment[slot];
+              return (
+                <div className="equip-slot" key={slot}>
+                  <span className="slot-label">{slot}</span>
+                  {item ? (
+                    <div className="slot-item" style={{ "--rarity": getRarityColor(item.rarity) } as React.CSSProperties}>
+                      <strong>{item.name}</strong>
+                      <ul>
+                        {item.modifiers.map((modifier) => (
+                          <li key={`${item.id}-${modifier.stat}`}>{modifier.label}</li>
+                        ))}
+                      </ul>
+                      <button className="text-action" onClick={() => unequip(slot)} type="button">
+                        Unequip
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="slot-empty">Empty</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </aside>
+
+        <aside className="panel inventory-panel" aria-label="Inventory">
+          <div className="panel-heading">
+            <p className="eyebrow">Backpack</p>
+            <h2>Inventory ({campaign.inventory.length})</h2>
+          </div>
+          <div className="inventory-list">
+            {campaign.inventory.length === 0 ? <p>No unequipped items.</p> : null}
+            {campaign.inventory.map((item) => (
+              <div
+                className={`inventory-item rarity-${item.rarity}`}
+                key={item.id}
+                style={{ "--rarity": getRarityColor(item.rarity) } as React.CSSProperties}
+              >
+                <div className="loot-card-heading">
+                  <span>{formatRarity(item.rarity)}</span>
+                  <strong>{item.name}</strong>
+                </div>
+                <div className="loot-meta">
+                  <span>{item.slot}</span>
+                  <span>Item level {item.itemLevel}</span>
+                </div>
+                <ul>
+                  {item.modifiers.map((modifier) => (
+                    <li key={`${item.id}-${modifier.stat}`}>{modifier.label}</li>
+                  ))}
+                </ul>
+                <div className="inventory-actions">
+                  <button className="secondary-action" onClick={() => equip(item.id)} type="button">
+                    Equip
+                  </button>
+                  <button className="text-action" onClick={() => salvage(item.id)} type="button">
+                    Salvage
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <aside className="panel shop-panel" aria-label="Shop">
+          <div className="panel-heading">
+            <p className="eyebrow">Merchant</p>
+            <h2>Shop</h2>
+          </div>
+          <button
+            className="secondary-action"
+            disabled={campaign.gold < rerollCost}
+            onClick={reroll}
+            type="button"
+          >
+            Reroll stock ({rerollCost} gold)
+          </button>
+          <div className="shop-list">
+            {shopOffers.map((offer) => (
+              <div
+                className={`shop-offer rarity-${offer.item.rarity}`}
+                key={offer.item.id}
+                style={{ "--rarity": getRarityColor(offer.item.rarity) } as React.CSSProperties}
+              >
+                <div className="loot-card-heading">
+                  <span>{formatRarity(offer.item.rarity)}</span>
+                  <strong>{offer.item.name}</strong>
+                </div>
+                <div className="loot-meta">
+                  <span>{offer.item.slot}</span>
+                  <span>Item level {offer.item.itemLevel}</span>
+                </div>
+                <ul>
+                  {offer.item.modifiers.map((modifier) => (
+                    <li key={`${offer.item.id}-${modifier.stat}`}>{modifier.label}</li>
+                  ))}
+                </ul>
+                <button
+                  className="secondary-action"
+                  disabled={campaign.gold < offer.price}
+                  onClick={() => buy(offer)}
+                  type="button"
+                >
+                  Buy ({offer.price} gold)
+                </button>
+              </div>
+            ))}
           </div>
         </aside>
       </section>
