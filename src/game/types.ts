@@ -35,6 +35,20 @@ export interface Stats {
   cooldownReduction: number;
 }
 
+export type AbilityEffect =
+  | { kind: "damage"; targets: number; damageMultiplier: number; apScaling: number }
+  | { kind: "buff"; duration: number; modifiers: Partial<Stats> }
+  | { kind: "shield"; amount: number; apScaling: number; duration: number }
+  | { kind: "summon"; dps: number; apScaling: number; interval: number; duration: number };
+
+export interface AbilityDefinition {
+  id: string;
+  name: string;
+  description: string;
+  cooldown: number;
+  effect: AbilityEffect;
+}
+
 export interface HeroClass {
   id: HeroClassId;
   name: string;
@@ -50,6 +64,7 @@ export interface HeroClass {
     cleaveTargets: number;
     damageMultiplier: number;
   };
+  abilities: AbilityDefinition[];
 }
 
 export interface TalentDefinition {
@@ -254,6 +269,33 @@ export type CombatEvent =
   | {
       type: "heroDefeated";
       time: number;
+    }
+  | {
+      type: "abilityCast";
+      time: number;
+      abilityId: string;
+      label: string;
+      targetIds: string[];
+    }
+  | {
+      type: "buff";
+      time: number;
+      abilityId: string;
+      label: string;
+      duration: number;
+    }
+  | {
+      type: "shield";
+      time: number;
+      abilityId: string;
+      amount: number;
+    }
+  | {
+      type: "summonTick";
+      time: number;
+      abilityId: string;
+      targetId: string;
+      damage: number;
     };
 
 export interface CombatResult {

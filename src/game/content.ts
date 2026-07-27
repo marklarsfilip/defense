@@ -39,6 +39,9 @@ export const heroClasses: HeroClass[] = [
       cleaveTargets: 4,
       damageMultiplier: 0.78,
     },
+    abilities: [
+      { id: "bloodlust", name: "Bloodlust", description: "Enters a frenzy, attacking faster and harder for a few seconds.", cooldown: 8, effect: { kind: "buff", duration: 4, modifiers: { attackSpeed: 0.6, damage: 8 } } },
+    ],
   },
   {
     id: "arcanist",
@@ -65,6 +68,9 @@ export const heroClasses: HeroClass[] = [
       cleaveTargets: 5,
       damageMultiplier: 0.88,
     },
+    abilities: [
+      { id: "arcane-nova", name: "Arcane Nova", description: "Detonates arcane energy across a pack of enemies.", cooldown: 6, effect: { kind: "damage", targets: 5, damageMultiplier: 0.9, apScaling: 1.4 } },
+    ],
   },
   {
     id: "ranger",
@@ -91,6 +97,9 @@ export const heroClasses: HeroClass[] = [
       cleaveTargets: 3,
       damageMultiplier: 0.95,
     },
+    abilities: [
+      { id: "piercing-volley", name: "Piercing Volley", description: "Looses a volley that punches through a line of enemies.", cooldown: 7, effect: { kind: "damage", targets: 3, damageMultiplier: 1.6, apScaling: 0.4 } },
+    ],
   },
   {
     id: "summoner",
@@ -117,6 +126,9 @@ export const heroClasses: HeroClass[] = [
       cleaveTargets: 4,
       damageMultiplier: 0.7,
     },
+    abilities: [
+      { id: "spirit-pack", name: "Spirit Pack", description: "Calls spirits that harry enemies for several seconds.", cooldown: 8, effect: { kind: "summon", dps: 14, apScaling: 0.6, interval: 0.8, duration: 6 } },
+    ],
   },
   {
     id: "guardian",
@@ -143,6 +155,9 @@ export const heroClasses: HeroClass[] = [
       cleaveTargets: 3,
       damageMultiplier: 0.9,
     },
+    abilities: [
+      { id: "bulwark", name: "Bulwark", description: "Raises a protective barrier that absorbs incoming damage.", cooldown: 9, effect: { kind: "shield", amount: 60, apScaling: 1.2, duration: 5 } },
+    ],
   },
 ];
 
