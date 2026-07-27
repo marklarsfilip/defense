@@ -1,5 +1,6 @@
-import type { ChestReward, CombatResult, HeroClassId, LootItem, LootRarity } from "./types";
+import type { ChestReward, CombatResult, Equipment, EquipmentSlot, HeroClassId, LootItem, LootRarity, ShopOffer } from "./types";
 import { filterTalentIdsForClass, getTalentPointBudget } from "./talents";
+import { EMPTY_EQUIPMENT } from "./equipment";
 
 export interface CampaignState {
   selectedClassId: HeroClassId;
@@ -13,6 +14,9 @@ export interface CampaignState {
   queuedBonusLevelAfter: number | null;
   chestsOpened: number;
   inventory: LootItem[];
+  equipment: Equipment;
+  shopRerolls: number;
+  purchases: number;
   selectedTalentIds: string[];
 }
 
@@ -32,6 +36,9 @@ export function createInitialCampaign(): CampaignState {
     queuedBonusLevelAfter: null,
     chestsOpened: 0,
     inventory: [],
+    equipment: { ...EMPTY_EQUIPMENT },
+    shopRerolls: 0,
+    purchases: 0,
     selectedTalentIds: [],
   };
 }
@@ -132,6 +139,9 @@ export function restoreCampaign(value: unknown): CampaignState {
         : null,
     chestsOpened: clampInteger(candidate.chestsOpened, 0, Number.MAX_SAFE_INTEGER, initial.chestsOpened),
     inventory: Array.isArray(candidate.inventory) ? candidate.inventory.filter(isLootItem) : initial.inventory,
+    equipment: restoreEquipment(candidate.equipment),
+    shopRerolls: clampInteger(candidate.shopRerolls, 0, Number.MAX_SAFE_INTEGER, initial.shopRerolls),
+    purchases: clampInteger(candidate.purchases, 0, Number.MAX_SAFE_INTEGER, initial.purchases),
     selectedTalentIds: filterTalentIdsForClass(selectedTalentIds, selectedClassId),
   };
 }
@@ -199,4 +209,24 @@ function isLootRarity(value: unknown): value is LootRarity {
     value === "legendary" ||
     value === "set"
   );
+}
+
+function restoreEquipment(value: unknown): Equipment {
+  const empty: Equipment = { weapon: null, armor: null, trinket: null };
+
+  if (!value || typeof value !== "object") {
+    return empty;
+  }
+
+  const candidate = value as Partial<Record<EquipmentSlot, unknown>>;
+
+  return {
+    weapon: restoreEquipmentSlot(candidate.weapon, "weapon"),
+    armor: restoreEquipmentSlot(candidate.armor, "armor"),
+    trinket: restoreEquipmentSlot(candidate.trinket, "trinket"),
+  };
+}
+
+function restoreEquipmentSlot(value: unknown, slot: EquipmentSlot): LootItem | null {
+  return isLootItem(value) && value.slot === slot ? value : null;
 }

@@ -137,3 +137,30 @@ describe("progression", () => {
     expect(campaign.selectedTalentIds).toEqual(["battle-hardened"]);
   });
 });
+
+describe("campaign state migration", () => {
+  it("initializes empty equipment, zero rerolls, zero purchases", () => {
+    const campaign = createInitialCampaign();
+    expect(campaign.equipment).toEqual({ weapon: null, armor: null, trinket: null });
+    expect(campaign.shopRerolls).toBe(0);
+    expect(campaign.purchases).toBe(0);
+  });
+
+  it("restores missing equipment/shop fields from an old save", () => {
+    const restored = restoreCampaign({ gold: 50, heroLevel: 3 });
+    expect(restored.equipment).toEqual({ weapon: null, armor: null, trinket: null });
+    expect(restored.shopRerolls).toBe(0);
+    expect(restored.purchases).toBe(0);
+  });
+
+  it("drops an equipped item whose slot does not match its key", () => {
+    const restored = restoreCampaign({
+      equipment: {
+        weapon: { id: "bad", name: "Mislotted", rarity: "rare", slot: "armor", itemLevel: 2, modifiers: [] },
+        armor: null,
+        trinket: null,
+      },
+    });
+    expect(restored.equipment.weapon).toBeNull();
+  });
+});
