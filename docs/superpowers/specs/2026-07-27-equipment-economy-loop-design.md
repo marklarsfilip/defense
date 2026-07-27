@@ -97,6 +97,7 @@ Add:
 
 - `equipment: { weapon: LootItem | null; armor: LootItem | null; trinket: LootItem | null }`
 - `shopRerolls: number`
+- `purchases: number` — a monotonic counter used only to give each purchased item a unique id suffix (`-p<n>`), so buying the same shop offer more than once never collides in inventory. Seeded to 0, persisted, and clamped on restore like the other counters.
 
 `createInitialCampaign` seeds `equipment: EMPTY_EQUIPMENT` and `shopRerolls: 0`.
 `restoreCampaign` gains migration defaults for both (equipped items validated with
