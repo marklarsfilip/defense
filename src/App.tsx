@@ -22,7 +22,7 @@ import {
 import { generateChestReward } from "./game/loot";
 import { simulateCombat } from "./game/simulateCombat";
 import { applyTalentsToHero, getAvailableTalents, getSelectedTalents, getTalentPointBudget } from "./game/talents";
-import type { ChestReward, CombatResult } from "./game/types";
+import type { ChestReward, CombatResult, EquipmentSlot } from "./game/types";
 
 const SAVE_KEY = "tbd-defense:campaign";
 
@@ -102,7 +102,7 @@ export function App() {
     setCampaign((current) => equipFromInventory(current, itemId));
   }
 
-  function unequip(slot: "weapon" | "armor" | "trinket") {
+  function unequip(slot: EquipmentSlot) {
     setCampaign((current) => unequipToInventory(current, slot));
   }
 

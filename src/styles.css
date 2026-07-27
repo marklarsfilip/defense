@@ -514,7 +514,10 @@ button {
   font-weight: 800;
 }
 
-.loot-card ul {
+.loot-card ul,
+.slot-item ul,
+.inventory-item ul,
+.shop-offer ul {
   display: grid;
   gap: 5px;
   margin: 0;
@@ -522,7 +525,10 @@ button {
   list-style: none;
 }
 
-.loot-card li {
+.loot-card li,
+.slot-item li,
+.inventory-item li,
+.shop-offer li {
   color: #d8e0ec;
   font-size: 12px;
 }
