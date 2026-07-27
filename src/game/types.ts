@@ -57,13 +57,6 @@ export interface HeroClass {
   color: string;
   damageKind: DamageKind;
   stats: Stats;
-  special: {
-    name: string;
-    description: string;
-    everyNthAttack: number;
-    cleaveTargets: number;
-    damageMultiplier: number;
-  };
   abilities: AbilityDefinition[];
 }
 

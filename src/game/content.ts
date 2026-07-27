@@ -32,13 +32,6 @@ export const heroClasses: HeroClass[] = [
       abilityPower: 0,
       cooldownReduction: 0,
     },
-    special: {
-      name: "Whirlwind Cut",
-      description: "Every fourth attack slashes several nearby enemies.",
-      everyNthAttack: 4,
-      cleaveTargets: 4,
-      damageMultiplier: 0.78,
-    },
     abilities: [
       { id: "bloodlust", name: "Bloodlust", description: "Enters a frenzy, attacking faster and harder for a few seconds.", cooldown: 8, effect: { kind: "buff", duration: 4, modifiers: { attackSpeed: 0.6, damage: 8 } } },
     ],
@@ -60,13 +53,6 @@ export const heroClasses: HeroClass[] = [
       critDamage: 1.65,
       abilityPower: 24,
       cooldownReduction: 0.08,
-    },
-    special: {
-      name: "Arcane Nova",
-      description: "Every third cast splashes into a small pack.",
-      everyNthAttack: 3,
-      cleaveTargets: 5,
-      damageMultiplier: 0.88,
     },
     abilities: [
       { id: "arcane-nova", name: "Arcane Nova", description: "Detonates arcane energy across a pack of enemies.", cooldown: 6, effect: { kind: "damage", targets: 5, damageMultiplier: 0.9, apScaling: 1.4 } },
@@ -90,13 +76,6 @@ export const heroClasses: HeroClass[] = [
       abilityPower: 0,
       cooldownReduction: 0.02,
     },
-    special: {
-      name: "Piercing Volley",
-      description: "Every fifth shot punches through a line of enemies.",
-      everyNthAttack: 5,
-      cleaveTargets: 3,
-      damageMultiplier: 0.95,
-    },
     abilities: [
       { id: "piercing-volley", name: "Piercing Volley", description: "Looses a volley that punches through a line of enemies.", cooldown: 7, effect: { kind: "damage", targets: 3, damageMultiplier: 1.6, apScaling: 0.4 } },
     ],
@@ -119,13 +98,6 @@ export const heroClasses: HeroClass[] = [
       abilityPower: 18,
       cooldownReduction: 0.06,
     },
-    special: {
-      name: "Spirit Pack",
-      description: "Every third command sends spirits at multiple enemies.",
-      everyNthAttack: 3,
-      cleaveTargets: 4,
-      damageMultiplier: 0.7,
-    },
     abilities: [
       { id: "spirit-pack", name: "Spirit Pack", description: "Calls spirits that harry enemies for several seconds.", cooldown: 8, effect: { kind: "summon", dps: 14, apScaling: 0.6, interval: 0.8, duration: 6 } },
     ],
@@ -147,13 +119,6 @@ export const heroClasses: HeroClass[] = [
       critDamage: 1.55,
       abilityPower: 0,
       cooldownReduction: 0,
-    },
-    special: {
-      name: "Shield Slam",
-      description: "Every fourth attack hits a small cluster while holding the line.",
-      everyNthAttack: 4,
-      cleaveTargets: 3,
-      damageMultiplier: 0.9,
     },
     abilities: [
       { id: "bulwark", name: "Bulwark", description: "Raises a protective barrier that absorbs incoming damage.", cooldown: 9, effect: { kind: "shield", amount: 60, apScaling: 1.2, duration: 5 } },

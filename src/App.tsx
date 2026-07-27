@@ -237,8 +237,8 @@ export function App() {
                 <dd>{effectiveHero.stats.health}</dd>
               </div>
               <div>
-                <dt>Special</dt>
-                <dd>{selectedClass.special.name}</dd>
+                <dt>Ability</dt>
+                <dd>{selectedClass.abilities.map((ability) => ability.name).join(", ")}</dd>
               </div>
             </dl>
           </div>
