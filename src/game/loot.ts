@@ -180,6 +180,10 @@ function rollModifierAmount(
   return quantizeModifierAmount(affix.stat, rawValue);
 }
 
+export function isPercentStat(stat: StatKey): boolean {
+  return PERCENT_STATS.has(stat);
+}
+
 export function quantizeModifierAmount(stat: StatKey, rawValue: number): number {
   if (PERCENT_STATS.has(stat)) {
     return Math.round(rawValue * 1000) / 1000;

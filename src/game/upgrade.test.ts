@@ -37,6 +37,33 @@ describe("upgradeItem", () => {
     expect(canUpgrade(maxed)).toBe(false);
     expect(upgradeItem(maxed)).toBe(maxed);
   });
+
+  it("grows a low flat modifier on every upgrade", () => {
+    let current = item({
+      upgradeLevel: 0,
+      modifiers: [{ stat: "damage", label: "Brutal: +1 damage", amount: 1 }],
+    });
+    const first = upgradeItem(current);
+    expect(first.modifiers[0].amount).toBeGreaterThanOrEqual(2);
+
+    const amounts = [current.modifiers[0].amount];
+    for (let i = 0; i < MAX_UPGRADE_LEVEL; i += 1) {
+      current = upgradeItem(current);
+      amounts.push(current.modifiers[0].amount);
+    }
+
+    for (let i = 1; i < amounts.length; i += 1) {
+      expect(amounts[i]).toBeGreaterThan(amounts[i - 1]);
+    }
+  });
+
+  it("grows a percent modifier without bumping it by a whole integer", () => {
+    const up = upgradeItem(item({
+      modifiers: [{ stat: "critChance", label: "Precise: +5% critical chance", amount: 0.05 }],
+    }));
+    expect(up.modifiers[0].amount).toBeGreaterThan(0.05);
+    expect(up.modifiers[0].amount).toBeLessThan(1);
+  });
 });
 
 describe("rerollItemModifiers", () => {

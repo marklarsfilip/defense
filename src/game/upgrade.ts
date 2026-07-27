@@ -1,4 +1,4 @@
-import { formatModifierValue, quantizeModifierAmount, rollItemModifiers } from "./loot";
+import { formatModifierValue, isPercentStat, quantizeModifierAmount, rollItemModifiers } from "./loot";
 import type { LootItem, LootModifier, LootRarity } from "./types";
 
 export const MAX_UPGRADE_LEVEL = 5;
@@ -60,7 +60,12 @@ export function rerollCost(item: LootItem): number {
 }
 
 function scaleModifier(modifier: LootModifier): LootModifier {
-  const amount = quantizeModifierAmount(modifier.stat, modifier.amount * UPGRADE_FACTOR);
+  let amount = quantizeModifierAmount(modifier.stat, modifier.amount * UPGRADE_FACTOR);
+  // Flat stats quantize to integers; ×1.15 on small values (1–3) would round back to
+  // the same integer, so guarantee an upgrade always increases a flat modifier.
+  if (!isPercentStat(modifier.stat) && amount <= modifier.amount) {
+    amount = modifier.amount + 1;
+  }
   const prefix = modifier.label.includes(":") ? modifier.label.slice(0, modifier.label.indexOf(":")) : modifier.stat;
   return {
     stat: modifier.stat,
