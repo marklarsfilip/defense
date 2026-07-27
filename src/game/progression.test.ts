@@ -13,6 +13,7 @@ import {
   selectCampaignClass,
   unequipToInventory,
 } from "./progression";
+import { salvageValue } from "./equipment";
 import type { CombatResult, LootItem, ShopOffer } from "./types";
 
 function makeItem(id: string, damage: number, slot: LootItem["slot"] = "weapon"): LootItem {
@@ -227,8 +228,15 @@ describe("equip / unequip / salvage reducers", () => {
     const item = makeItem("junk", 3);
     const base = { ...createInitialCampaign(), gold: 100, inventory: [item] };
     const next = salvageItem(base, "junk");
-    expect(next.gold).toBeGreaterThan(100);
+    expect(next.gold).toBe(100 + salvageValue(item));
     expect(next.inventory).toHaveLength(0);
+  });
+
+  it("no-ops equip/salvage when id is not in inventory (e.g. it's equipped)", () => {
+    const base = { ...createInitialCampaign(), equipment: { weapon: makeItem("eq", 10), armor: null, trinket: null } };
+    expect(equipFromInventory(base, "eq")).toBe(base); // "eq" is equipped, not in inventory
+    expect(salvageItem(base, "eq")).toBe(base);
+    expect(unequipToInventory({ ...createInitialCampaign() }, "weapon")).toEqual(createInitialCampaign()); // empty slot no-op
   });
 });
 
@@ -279,6 +287,15 @@ describe("applyCombatRewards acquisition", () => {
     const chest = { item: makeItem("drop", 12), goldBonus: 0, seed: 1, levelId: "l1" };
     const next = applyCombatRewards(base, result, chest);
     expect(next.equipment.weapon?.id).toBe("drop");
+  });
+
+  it("sends a weaker chest drop to inventory without displacing a stronger equipped item", () => {
+    const base = { ...createInitialCampaign(), equipment: { weapon: makeItem("strong", 50), armor: null, trinket: null } };
+    const result = { won: true, level: { id: "l2", kind: "normal", levelNumber: 2 }, xp: 0, gold: 0, enemiesDefeated: 0 } as unknown as CombatResult;
+    const chest = { item: makeItem("weak", 5), goldBonus: 0, seed: 1, levelId: "l2" };
+    const next = applyCombatRewards(base, result, chest);
+    expect(next.equipment.weapon?.id).toBe("strong");
+    expect(next.inventory.map((i) => i.id)).toContain("weak");
   });
 
   it("resets shopRerolls to 0 on hero level-up", () => {
