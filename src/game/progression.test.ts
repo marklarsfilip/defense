@@ -2,13 +2,29 @@ import { describe, expect, it } from "vitest";
 import { heroClasses, starterLevel } from "./content";
 import {
   applyCombatRewards,
+  buyShopOffer,
   createInitialCampaign,
+  equipFromInventory,
   getExperienceForNextLevel,
   learnCampaignTalent,
+  rerollShop,
   restoreCampaign,
+  salvageItem,
   selectCampaignClass,
+  unequipToInventory,
 } from "./progression";
-import type { CombatResult } from "./types";
+import type { CombatResult, LootItem, ShopOffer } from "./types";
+
+function makeItem(id: string, damage: number, slot: LootItem["slot"] = "weapon"): LootItem {
+  return {
+    id,
+    name: `Item ${id}`,
+    rarity: "rare",
+    slot,
+    itemLevel: 5,
+    modifiers: [{ stat: "damage", label: `+${damage} damage`, amount: damage }],
+  };
+}
 
 const victoryResult: CombatResult = {
   heroClass: heroClasses[0],
@@ -55,12 +71,13 @@ describe("progression", () => {
     expect(campaign.experience).toBe(50);
   });
 
-  it("banks chest gold and inventory on victory", () => {
+  it("banks chest gold and auto-equips the chest item into its empty slot", () => {
     const campaign = applyCombatRewards(createInitialCampaign(), victoryResult, chestReward);
 
     expect(campaign.gold).toBe(97);
     expect(campaign.chestsOpened).toBe(1);
-    expect(campaign.inventory).toEqual([chestReward.item]);
+    expect(campaign.equipment.weapon).toEqual(chestReward.item);
+    expect(campaign.inventory).toEqual([]);
   });
 
   it("queues bonus levels without consuming the next normal level until cleared", () => {
@@ -174,5 +191,104 @@ describe("campaign state migration", () => {
     const empty = { weapon: null, armor: null, trinket: null };
     expect(restoreCampaign({ equipment: [] }).equipment).toEqual(empty);
     expect(restoreCampaign({ equipment: "nope" }).equipment).toEqual(empty);
+  });
+});
+
+describe("equip / unequip / salvage reducers", () => {
+  it("equips an inventory item into its slot", () => {
+    const base = { ...createInitialCampaign(), inventory: [makeItem("w1", 10)] };
+    const next = equipFromInventory(base, "w1");
+    expect(next.equipment.weapon?.id).toBe("w1");
+    expect(next.inventory).toHaveLength(0);
+  });
+
+  it("returns the displaced item to inventory when equipping over a slot", () => {
+    const base = {
+      ...createInitialCampaign(),
+      equipment: { weapon: makeItem("old", 5), armor: null, trinket: null },
+      inventory: [makeItem("new", 20)],
+    };
+    const next = equipFromInventory(base, "new");
+    expect(next.equipment.weapon?.id).toBe("new");
+    expect(next.inventory.map((i) => i.id)).toContain("old");
+  });
+
+  it("unequips a slot back to inventory", () => {
+    const base = {
+      ...createInitialCampaign(),
+      equipment: { weapon: makeItem("w1", 10), armor: null, trinket: null },
+    };
+    const next = unequipToInventory(base, "weapon");
+    expect(next.equipment.weapon).toBeNull();
+    expect(next.inventory.map((i) => i.id)).toContain("w1");
+  });
+
+  it("salvages an inventory item for gold and removes it", () => {
+    const item = makeItem("junk", 3);
+    const base = { ...createInitialCampaign(), gold: 100, inventory: [item] };
+    const next = salvageItem(base, "junk");
+    expect(next.gold).toBeGreaterThan(100);
+    expect(next.inventory).toHaveLength(0);
+  });
+});
+
+describe("shop reducers", () => {
+  const offer: ShopOffer = { item: makeItem("shop-1", 30), price: 40 };
+
+  it("buys an offer: deducts gold and acquires the item", () => {
+    const base = { ...createInitialCampaign(), gold: 100 };
+    const next = buyShopOffer(base, offer);
+    expect(next.gold).toBe(60);
+    expect(next.equipment.weapon?.id).toBe("shop-1-p0");
+    expect(next.purchases).toBe(1);
+  });
+
+  it("gives purchased items unique ids across repeat buys", () => {
+    const base = { ...createInitialCampaign(), gold: 1000 };
+    const once = buyShopOffer(base, offer);
+    const twice = buyShopOffer(once, offer);
+    const ids = [twice.equipment.weapon?.id, ...twice.inventory.map((i) => i.id)];
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("no-ops a purchase the player cannot afford", () => {
+    const base = { ...createInitialCampaign(), gold: 10 };
+    expect(buyShopOffer(base, offer)).toBe(base);
+  });
+
+  it("rerolls: deducts the reroll cost and increments rerolls", () => {
+    const base = { ...createInitialCampaign(), gold: 100, shopRerolls: 0 };
+    const next = rerollShop(base);
+    expect(next.shopRerolls).toBe(1);
+    expect(next.gold).toBe(100 - 25);
+  });
+
+  it("no-ops a reroll the player cannot afford", () => {
+    const base = { ...createInitialCampaign(), gold: 5 };
+    expect(rerollShop(base)).toBe(base);
+  });
+});
+
+describe("applyCombatRewards acquisition", () => {
+  it("auto-equips a won chest item into an empty slot", () => {
+    const base = createInitialCampaign();
+    const result = {
+      won: true, level: { id: "l1", kind: "normal", levelNumber: 1 }, xp: 10, gold: 5,
+      enemiesDefeated: 3,
+    } as unknown as CombatResult;
+    const chest = { item: makeItem("drop", 12), goldBonus: 0, seed: 1, levelId: "l1" };
+    const next = applyCombatRewards(base, result, chest);
+    expect(next.equipment.weapon?.id).toBe("drop");
+  });
+
+  it("resets shopRerolls to 0 on hero level-up", () => {
+    const base = { ...createInitialCampaign(), heroLevel: 1, experience: 0, shopRerolls: 3 };
+    const result = {
+      won: true, level: { id: "l1", kind: "normal", levelNumber: 1 }, xp: 100000, gold: 0,
+      enemiesDefeated: 1,
+    } as unknown as CombatResult;
+    const next = applyCombatRewards(base, result);
+    expect(next.heroLevel).toBeGreaterThan(1);
+    expect(next.shopRerolls).toBe(0);
   });
 });

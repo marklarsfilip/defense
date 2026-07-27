@@ -1,6 +1,7 @@
 import type { ChestReward, CombatResult, Equipment, EquipmentSlot, HeroClassId, LootItem, LootRarity, ShopOffer } from "./types";
 import { filterTalentIdsForClass, getTalentPointBudget } from "./talents";
-import { EMPTY_EQUIPMENT } from "./equipment";
+import { EMPTY_EQUIPMENT, autoEquipIfBetter, salvageValue } from "./equipment";
+import { getRerollCost } from "./shop";
 
 export interface CampaignState {
   selectedClassId: HeroClassId;
@@ -66,6 +67,99 @@ export function learnCampaignTalent(state: CampaignState, talentId: string): Cam
   };
 }
 
+export function equipFromInventory(state: CampaignState, itemId: string): CampaignState {
+  const item = state.inventory.find((entry) => entry.id === itemId);
+
+  if (!item) {
+    return state;
+  }
+
+  const displaced = state.equipment[item.slot];
+  const inventoryWithoutItem = state.inventory.filter((entry) => entry.id !== itemId);
+
+  return {
+    ...state,
+    equipment: { ...state.equipment, [item.slot]: item },
+    inventory: displaced ? [displaced, ...inventoryWithoutItem] : inventoryWithoutItem,
+  };
+}
+
+export function unequipToInventory(state: CampaignState, slot: EquipmentSlot): CampaignState {
+  const equipped = state.equipment[slot];
+
+  if (!equipped) {
+    return state;
+  }
+
+  return {
+    ...state,
+    equipment: { ...state.equipment, [slot]: null },
+    inventory: [equipped, ...state.inventory],
+  };
+}
+
+export function salvageItem(state: CampaignState, itemId: string): CampaignState {
+  const item = state.inventory.find((entry) => entry.id === itemId);
+
+  if (!item) {
+    return state;
+  }
+
+  return {
+    ...state,
+    gold: state.gold + salvageValue(item),
+    inventory: state.inventory.filter((entry) => entry.id !== itemId),
+  };
+}
+
+export function buyShopOffer(state: CampaignState, offer: ShopOffer): CampaignState {
+  if (state.gold < offer.price) {
+    return state;
+  }
+
+  const purchasedItem: LootItem = { ...offer.item, id: `${offer.item.id}-p${state.purchases}` };
+  const acquired = acquireItem(state.equipment, state.inventory, purchasedItem);
+
+  return {
+    ...state,
+    gold: state.gold - offer.price,
+    purchases: state.purchases + 1,
+    equipment: acquired.equipment,
+    inventory: acquired.inventory,
+  };
+}
+
+export function rerollShop(state: CampaignState): CampaignState {
+  const cost = getRerollCost(state.shopRerolls);
+
+  if (state.gold < cost) {
+    return state;
+  }
+
+  return {
+    ...state,
+    gold: state.gold - cost,
+    shopRerolls: state.shopRerolls + 1,
+  };
+}
+
+function acquireItem(
+  equipment: Equipment,
+  inventory: LootItem[],
+  item: LootItem,
+): { equipment: Equipment; inventory: LootItem[] } {
+  const result = autoEquipIfBetter(equipment, item);
+
+  if (result.equipped) {
+    return {
+      equipment: result.equipment,
+      inventory: result.replaced ? [result.replaced, ...inventory] : inventory,
+    };
+  }
+
+  return { equipment, inventory: [item, ...inventory] };
+}
+
 export function applyCombatRewards(
   state: CampaignState,
   result: CombatResult,
@@ -81,6 +175,10 @@ export function applyCombatRewards(
     ? state.completedLevelIds
     : [...state.completedLevelIds, result.level.id];
 
+  const acquired = chestReward
+    ? acquireItem(state.equipment, state.inventory, chestReward.item)
+    : { equipment: state.equipment, inventory: state.inventory };
+
   return {
     ...state,
     heroLevel: leveled.heroLevel,
@@ -92,7 +190,9 @@ export function applyCombatRewards(
     nextLevelNumber: result.level.kind === "bonus" ? state.nextLevelNumber : Math.max(state.nextLevelNumber, result.level.levelNumber + 1),
     queuedBonusLevelAfter: result.level.kind === "bonus" ? null : queuedBonusLevelAfter ?? null,
     chestsOpened: state.chestsOpened + (chestReward ? 1 : 0),
-    inventory: chestReward ? [chestReward.item, ...state.inventory] : state.inventory,
+    equipment: acquired.equipment,
+    inventory: acquired.inventory,
+    shopRerolls: leveled.heroLevel > state.heroLevel ? 0 : state.shopRerolls,
   };
 }
 
