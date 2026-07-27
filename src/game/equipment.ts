@@ -35,6 +35,9 @@ export function applyEquipmentToHero(heroClass: HeroClass, equipment: Equipment)
     (item): item is LootItem => item !== null,
   );
 
+  // Applied one modifier at a time to preserve additivity through applyStatModifiers.
+  // Correct as long as modifiers are non-negative: incremental clamping then equals
+  // clamping the summed total. Revisit if penalty/negative affixes are ever added.
   const stats = equipped.reduce(
     (current, item) =>
       item.modifiers.reduce(
