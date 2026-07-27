@@ -3,8 +3,9 @@ import { Coins, Play, RotateCcw, Save, Sparkles, Trophy, Zap } from "lucide-reac
 import { CombatReplay } from "./components/CombatReplay";
 import { heroClasses } from "./game/content";
 import { createBonusLevel, createCampaignLevel, shouldQueueBonusLevel } from "./game/levels";
-import { applyEquipmentToHero } from "./game/equipment";
+import { applyEquipmentToHero, getActiveSetBonuses } from "./game/equipment";
 import { rollShopStock, getRerollCost } from "./game/shop";
+import { upgradeCost, rerollCost, canUpgrade } from "./game/upgrade";
 import { applyAllocationToHero, ALLOCATABLE_STATS, getStatPointBudget, getAllocatedPointCount } from "./game/allocation";
 import {
   allocateStat,
@@ -18,9 +19,11 @@ import {
   rerollShop,
   resetAllocation,
   restoreCampaign,
+  rerollItemById,
   salvageItem,
   selectCampaignClass,
   unequipToInventory,
+  upgradeItemById,
   type CampaignState,
 } from "./game/progression";
 import { generateChestReward } from "./game/loot";
@@ -51,7 +54,7 @@ export function App() {
     () => rollShopStock(campaign.heroLevel, campaign.shopRerolls),
     [campaign.heroLevel, campaign.shopRerolls],
   );
-  const rerollCost = getRerollCost(campaign.shopRerolls);
+  const shopRerollCost = getRerollCost(campaign.shopRerolls);
   const talentPointBudget = getTalentPointBudget(campaign.heroLevel);
   const availableTalents = getAvailableTalents(campaign.heroLevel, campaign.selectedClassId, campaign.selectedTalentIds);
   const selectedTalents = getSelectedTalents(campaign.selectedTalentIds);
@@ -69,6 +72,7 @@ export function App() {
   const statBudget = getStatPointBudget(campaign.heroLevel);
   const pointsSpent = getAllocatedPointCount(campaign.statAllocation);
   const pointsRemaining = statBudget - pointsSpent;
+  const activeSetBonuses = useMemo(() => getActiveSetBonuses(campaign.equipment), [campaign.equipment]);
 
   useEffect(() => {
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(campaign));
@@ -121,6 +125,13 @@ export function App() {
     setCampaign((current) => salvageItem(current, itemId));
   }
 
+  function upgradeItemAction(itemId: string) {
+    setCampaign((current) => upgradeItemById(current, itemId));
+  }
+  function rerollItemAction(itemId: string) {
+    setCampaign((current) => rerollItemById(current, itemId));
+  }
+
   function buy(offer: (typeof shopOffers)[number]) {
     setCampaign((current) => buyShopOffer(current, offer));
   }
@@ -137,6 +148,23 @@ export function App() {
   }
   function resetPoints() {
     setCampaign((current) => resetAllocation(current));
+  }
+
+  function itemUpgradeControls(item: (typeof campaign.inventory)[number]) {
+    return (
+      <div className="item-actions">
+        <button
+          disabled={!canUpgrade(item) || campaign.gold < upgradeCost(item)}
+          onClick={() => upgradeItemAction(item.id)}
+          type="button"
+        >
+          {canUpgrade(item) ? `Upgrade (${upgradeCost(item)}g)` : "Max"}
+        </button>
+        <button disabled={campaign.gold < rerollCost(item)} onClick={() => rerollItemAction(item.id)} type="button">
+          Reroll ({rerollCost(item)}g)
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -426,6 +454,8 @@ export function App() {
                           <li key={`${item.id}-${modifier.stat}`}>{modifier.label}</li>
                         ))}
                       </ul>
+                      {item.upgradeLevel ? <span className="upgrade-badge">+{item.upgradeLevel}</span> : null}
+                      {itemUpgradeControls(item)}
                       <button className="text-action" onClick={() => unequip(slot)} type="button">
                         Unequip
                       </button>
@@ -437,6 +467,23 @@ export function App() {
               );
             })}
           </div>
+
+          {activeSetBonuses.length > 0 ? (
+            <div className="set-bonuses" aria-label="Active set bonuses">
+              <p className="eyebrow">Set bonuses</p>
+              {activeSetBonuses.map((bonus) => (
+                <div className="set-bonus-row" key={bonus.setId}>
+                  <strong>{bonus.setName}</strong>
+                  <span>
+                    {bonus.pieces}-piece ({bonus.tier}pc bonus):{" "}
+                    {Object.entries(bonus.modifiers)
+                      .map(([stat, value]) => `+${value} ${stat}`)
+                      .join(", ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </aside>
 
         <aside className="panel inventory-panel" aria-label="Inventory">
@@ -465,6 +512,8 @@ export function App() {
                     <li key={`${item.id}-${modifier.stat}`}>{modifier.label}</li>
                   ))}
                 </ul>
+                {item.upgradeLevel ? <span className="upgrade-badge">+{item.upgradeLevel}</span> : null}
+                {itemUpgradeControls(item)}
                 <div className="inventory-actions">
                   <button className="secondary-action" onClick={() => equip(item.id)} type="button">
                     Equip
@@ -485,11 +534,11 @@ export function App() {
           </div>
           <button
             className="secondary-action"
-            disabled={campaign.gold < rerollCost}
+            disabled={campaign.gold < shopRerollCost}
             onClick={reroll}
             type="button"
           >
-            Reroll stock ({rerollCost} gold)
+            Reroll stock ({shopRerollCost} gold)
           </button>
           <div className="shop-list">
             {shopOffers.map((offer) => (
