@@ -40,6 +40,9 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
   const activeBuffs: ActiveBuff[] = [];
   const activeSummons: ActiveSummon[] = [];
   let shield: { amount: number; expiresAt: number } | null = null;
+  // Read `shield` through an accessor: TypeScript's control-flow analysis narrows a
+  // `let` that is reassigned inside the nested fireAbility() closure to `never` at
+  // same-scope reads, so a direct read (or plain const) fails to compile. Do not inline.
   function getShield(): { amount: number; expiresAt: number } | null {
     return shield;
   }
@@ -141,7 +144,7 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
     activeSummons.push({
       abilityId: ability.id,
       perTick: summonDamagePerTick(effect, heroClass.stats.abilityPower),
-      interval: effect.interval,
+      interval: Math.max(0.05, effect.interval),
       nextTick: time + effect.interval,
       expiresAt: time + effect.duration,
     });
@@ -210,6 +213,11 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
     for (let i = activeSummons.length - 1; i >= 0; i -= 1) {
       if (time > activeSummons[i].expiresAt) {
         activeSummons.splice(i, 1);
+      }
+    }
+    for (let i = activeBuffs.length - 1; i >= 0; i -= 1) {
+      if (time > activeBuffs[i].expiresAt) {
+        activeBuffs.splice(i, 1);
       }
     }
 

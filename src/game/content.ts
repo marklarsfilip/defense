@@ -157,6 +157,7 @@ export const heroClasses: HeroClass[] = [
     },
     abilities: [
       { id: "bulwark", name: "Bulwark", description: "Raises a protective barrier that absorbs incoming damage.", cooldown: 9, effect: { kind: "shield", amount: 60, apScaling: 1.2, duration: 5 } },
+      // Second ability: a damage source so Guardian can clear level 1 — bulwark deals no damage.
       { id: "shield-slam", name: "Shield Slam", description: "Crashes a shield into a small cluster of enemies.", cooldown: 5, effect: { kind: "damage", targets: 3, damageMultiplier: 0.9, apScaling: 0.6 } },
     ],
   },
