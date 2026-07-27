@@ -160,6 +160,8 @@ export interface LootItem {
   slot: EquipmentSlot;
   itemLevel: number;
   modifiers: LootModifier[];
+  upgradeLevel?: number;
+  rerolls?: number;
   setId?: string;
   setName?: string;
 }

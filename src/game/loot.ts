@@ -65,6 +65,16 @@ export function generateLootItem(
   };
 }
 
+export function rollItemModifiers(rarity: LootRarity, itemLevel: number, seed: number): LootModifier[] {
+  const random = createSeededRandom(seed);
+  const definition = lootRarities[rarity];
+  return rollModifiers(itemLevel, definition.powerMultiplier, definition.modifierCount, random);
+}
+
+export function formatModifierValue(stat: StatKey, amount: number): string {
+  return formatModifier(stat, amount);
+}
+
 export function rollRarity(weights: Record<LootRarity, number>, random: () => number): LootRarity {
   const entries = Object.entries(weights).filter(([, weight]) => weight > 0) as Array<[LootRarity, number]>;
   const totalWeight = entries.reduce((total, [, weight]) => total + weight, 0);
@@ -167,11 +177,13 @@ function rollModifierAmount(
   random: () => number,
 ): number {
   const rawValue = (affix.minPerLevel + (affix.maxPerLevel - affix.minPerLevel) * random()) * itemLevel * powerMultiplier;
+  return quantizeModifierAmount(affix.stat, rawValue);
+}
 
-  if (PERCENT_STATS.has(affix.stat)) {
+export function quantizeModifierAmount(stat: StatKey, rawValue: number): number {
+  if (PERCENT_STATS.has(stat)) {
     return Math.round(rawValue * 1000) / 1000;
   }
-
   return Math.max(1, Math.round(rawValue));
 }
 
