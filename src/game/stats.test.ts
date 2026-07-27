@@ -27,8 +27,20 @@ describe("applyStatModifiers", () => {
     expect(result.cooldownReduction).toBe(0.75);
   });
 
+  it("clamps critChance and cooldownReduction to a floor of 0", () => {
+    const result = applyStatModifiers(BASE, { critChance: -2, cooldownReduction: -2 });
+    expect(result.critChance).toBe(0);
+    expect(result.cooldownReduction).toBe(0);
+  });
+
   it("does not mutate the input", () => {
-    applyStatModifiers(BASE, { damage: 5 });
+    const result = applyStatModifiers(BASE, { damage: 5 });
     expect(BASE.damage).toBe(20);
+    expect(result).not.toBe(BASE);
+  });
+
+  it("carries over unmodified fields unchanged", () => {
+    const result = applyStatModifiers(BASE, { damage: 5 });
+    expect(result.armor).toBe(BASE.armor);
   });
 });
