@@ -61,6 +61,8 @@ export function getActiveSetBonuses(equipment: Equipment): ActiveSetBonus[] {
     active.push({ setId, setName, pieces, tier, modifiers: tier === 3 ? definition.three : definition.two });
   }
 
+  // With current content at most one set can reach >=2 pieces (each set has one piece
+  // per slot across the three slots), so this array holds at most one entry today.
   return active;
 }
 
