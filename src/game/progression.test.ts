@@ -328,6 +328,29 @@ describe("stat allocation migration", () => {
     });
     expect(restored.inventory).toHaveLength(0);
   });
+
+  it("drops a persisted item whose rerolls is not a number", () => {
+    const restored = restoreCampaign({
+      inventory: [{ id: "z", name: "Bad", rarity: "rare", slot: "weapon", itemLevel: 3, modifiers: [], rerolls: "2" }],
+    });
+    expect(restored.inventory).toHaveLength(0);
+  });
+
+  it("preserves a within-budget allocation unchanged", () => {
+    const allocation = { health: 2, damage: 1, armor: 0, abilityPower: 0, critChance: 0 };
+    // budget at level 10 is (10-1)*2 = 18, so nothing is trimmed.
+    expect(restoreCampaign({ heroLevel: 10, statAllocation: allocation }).statAllocation).toEqual(allocation);
+  });
+
+  it("trims later stats before earlier ones when over budget", () => {
+    // heroLevel 2 => budget 2. Total allocated is 10, so 8 must be trimmed from the end first.
+    const restored = restoreCampaign({
+      heroLevel: 2,
+      statAllocation: { health: 5, damage: 0, armor: 0, abilityPower: 0, critChance: 5 },
+    });
+    expect(restored.statAllocation.health).toBe(2);
+    expect(restored.statAllocation.critChance).toBe(0);
+  });
 });
 
 describe("applyCombatRewards acquisition", () => {

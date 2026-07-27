@@ -230,9 +230,11 @@ export function restoreCampaign(value: unknown): CampaignState {
     ? candidate.selectedTalentIds.filter((id): id is string => typeof id === "string")
     : initial.selectedTalentIds;
 
+  const restoredHeroLevel = clampInteger(candidate.heroLevel, 1, MAX_HERO_LEVEL, initial.heroLevel);
+
   return {
     selectedClassId,
-    heroLevel: clampInteger(candidate.heroLevel, 1, MAX_HERO_LEVEL, initial.heroLevel),
+    heroLevel: restoredHeroLevel,
     experience: clampInteger(candidate.experience, 0, Number.MAX_SAFE_INTEGER, initial.experience),
     gold: clampInteger(candidate.gold, 0, Number.MAX_SAFE_INTEGER, initial.gold),
     victories: clampInteger(candidate.victories, 0, Number.MAX_SAFE_INTEGER, initial.victories),
@@ -256,7 +258,7 @@ export function restoreCampaign(value: unknown): CampaignState {
     shopRerolls: clampInteger(candidate.shopRerolls, 0, Number.MAX_SAFE_INTEGER, initial.shopRerolls),
     purchases: clampInteger(candidate.purchases, 0, Number.MAX_SAFE_INTEGER, initial.purchases),
     selectedTalentIds: filterTalentIdsForClass(selectedTalentIds, selectedClassId),
-    statAllocation: restoreAllocation(candidate.statAllocation, clampInteger(candidate.heroLevel, 1, MAX_HERO_LEVEL, initial.heroLevel)),
+    statAllocation: restoreAllocation(candidate.statAllocation, restoredHeroLevel),
   };
 }
 
@@ -312,11 +314,13 @@ function isLootItem(value: unknown): value is LootItem {
     typeof candidate.itemLevel === "number" &&
     Array.isArray(candidate.modifiers) &&
     candidate.modifiers.every(isLootModifier) &&
-    (candidate.upgradeLevel === undefined ||
-      (typeof candidate.upgradeLevel === "number" && Number.isFinite(candidate.upgradeLevel) && candidate.upgradeLevel >= 0)) &&
-    (candidate.rerolls === undefined ||
-      (typeof candidate.rerolls === "number" && Number.isFinite(candidate.rerolls) && candidate.rerolls >= 0))
+    isNonNegativeNumberOrUndefined(candidate.upgradeLevel) &&
+    isNonNegativeNumberOrUndefined(candidate.rerolls)
   );
+}
+
+function isNonNegativeNumberOrUndefined(value: unknown): boolean {
+  return value === undefined || (typeof value === "number" && Number.isFinite(value) && value >= 0);
 }
 
 function isLootModifier(value: unknown): boolean {
@@ -368,7 +372,9 @@ function restoreAllocation(value: unknown, heroLevel: number): StatAllocation {
     }
   }
 
-  // Clamp total down to the current budget, trimming from the end deterministically.
+  // Clamp total down to the current budget, trimming from the end of ALLOCATABLE_STATS,
+  // so on an over-budget (tampered/downgraded) save the primary stats (health, damage) are
+  // preserved and the later stats (critChance, abilityPower) are sacrificed first.
   const budget = getStatPointBudget(heroLevel);
   let overflow = getAllocatedPointCount(allocation) - budget;
   if (overflow > 0) {
