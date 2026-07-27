@@ -171,6 +171,17 @@ export interface ChestReward {
   item: LootItem;
 }
 
+export interface Equipment {
+  weapon: LootItem | null;
+  armor: LootItem | null;
+  trinket: LootItem | null;
+}
+
+export interface ShopOffer {
+  item: LootItem;
+  price: number;
+}
+
 export interface CombatEnemy {
   id: string;
   definitionId: string;
