@@ -212,10 +212,8 @@ function isLootRarity(value: unknown): value is LootRarity {
 }
 
 function restoreEquipment(value: unknown): Equipment {
-  const empty: Equipment = { weapon: null, armor: null, trinket: null };
-
   if (!value || typeof value !== "object") {
-    return empty;
+    return { ...EMPTY_EQUIPMENT };
   }
 
   const candidate = value as Partial<Record<EquipmentSlot, unknown>>;

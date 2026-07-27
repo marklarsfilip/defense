@@ -163,4 +163,16 @@ describe("campaign state migration", () => {
     });
     expect(restored.equipment.weapon).toBeNull();
   });
+
+  it("keeps a correctly-slotted equipped item on restore", () => {
+    const item = { id: "w1", name: "Good Axe", rarity: "rare", slot: "weapon", itemLevel: 4, modifiers: [] };
+    const restored = restoreCampaign({ equipment: { weapon: item, armor: null, trinket: null } });
+    expect(restored.equipment.weapon).toEqual(item);
+  });
+
+  it("degrades non-object equipment values to empty equipment", () => {
+    const empty = { weapon: null, armor: null, trinket: null };
+    expect(restoreCampaign({ equipment: [] }).equipment).toEqual(empty);
+    expect(restoreCampaign({ equipment: "nope" }).equipment).toEqual(empty);
+  });
 });
