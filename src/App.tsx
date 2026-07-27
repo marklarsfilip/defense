@@ -26,10 +26,10 @@ import {
   upgradeItemById,
   type CampaignState,
 } from "./game/progression";
-import { generateChestReward } from "./game/loot";
+import { formatModifierValue, generateChestReward } from "./game/loot";
 import { simulateCombat } from "./game/simulateCombat";
 import { applyTalentsToHero, getAvailableTalents, getSelectedTalents, getTalentPointBudget } from "./game/talents";
-import type { ChestReward, CombatResult, EquipmentSlot } from "./game/types";
+import type { ChestReward, CombatResult, EquipmentSlot, StatKey } from "./game/types";
 
 const SAVE_KEY = "tbd-defense:campaign";
 
@@ -475,9 +475,9 @@ export function App() {
                 <div className="set-bonus-row" key={bonus.setId}>
                   <strong>{bonus.setName}</strong>
                   <span>
-                    {bonus.pieces}-piece ({bonus.tier}pc bonus):{" "}
+                    {bonus.pieces}-piece bonus:{" "}
                     {Object.entries(bonus.modifiers)
-                      .map(([stat, value]) => `+${value} ${stat}`)
+                      .map(([stat, value]) => formatModifierValue(stat as StatKey, value as number))
                       .join(", ")}
                   </span>
                 </div>
