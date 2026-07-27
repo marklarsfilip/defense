@@ -419,7 +419,13 @@ export function App() {
             <p className="eyebrow">Recent events</p>
             <ol>
               {(combatResult?.events ?? [])
-                .filter((event) => event.type === "attack" || event.type === "death" || event.type === "levelComplete")
+                .filter(
+                  (event) =>
+                    event.type === "attack" ||
+                    event.type === "death" ||
+                    event.type === "levelComplete" ||
+                    event.type === "abilityCast",
+                )
                 .slice(-7)
                 .map((event, index) => (
                   <li key={`${event.type}-${event.time}-${index}`}>
@@ -427,6 +433,7 @@ export function App() {
                     {event.type === "attack" && `${event.label} hit ${event.targetIds.length} target(s)`}
                     {event.type === "death" && `${event.enemyId} collapsed`}
                     {event.type === "levelComplete" && `Level complete: ${event.gold} gold`}
+                    {event.type === "abilityCast" && `Cast ${event.label}`}
                   </li>
                 ))}
             </ol>

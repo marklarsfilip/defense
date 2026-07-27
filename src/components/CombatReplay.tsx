@@ -136,9 +136,29 @@ function TimelineActors({ heroClass, result, time }: { heroClass: HeroClass; res
       ),
     [result.events, time],
   );
+  const casting = useMemo(
+    () =>
+      result.events.some(
+        (event) => event.type === "abilityCast" && time >= event.time && time <= event.time + 0.35,
+      ),
+    [result.events, time],
+  );
 
   return (
     <>
+      {casting ? (
+        <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[1.1, 1.35, 40]} />
+          <meshStandardMaterial
+            color={heroClass.color}
+            emissive={heroClass.color}
+            emissiveIntensity={1.4}
+            transparent
+            opacity={0.7}
+          />
+        </mesh>
+      ) : null}
+
       {enemies.map((enemy, index) => {
         const deathTime = deaths.get(enemy.enemyId);
         if (time < enemy.time || (deathTime && time > deathTime + 0.7)) {
