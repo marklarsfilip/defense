@@ -1,7 +1,18 @@
-import type { ChestReward, CombatResult, Equipment, EquipmentSlot, HeroClassId, LootItem, LootRarity, ShopOffer } from "./types";
+import type {
+  AllocatableStat,
+  ChestReward,
+  CombatResult,
+  Equipment,
+  EquipmentSlot,
+  HeroClassId,
+  LootItem,
+  LootRarity,
+  ShopOffer,
+} from "./types";
 import { filterTalentIdsForClass, getTalentPointBudget } from "./talents";
 import { EMPTY_EQUIPMENT, autoEquipIfBetter, salvageValue } from "./equipment";
 import { getRerollCost } from "./shop";
+import { ALLOCATABLE_STATS, EMPTY_ALLOCATION, getAllocatedPointCount, getStatPointBudget, type StatAllocation } from "./allocation";
 
 export interface CampaignState {
   selectedClassId: HeroClassId;
@@ -19,6 +30,7 @@ export interface CampaignState {
   shopRerolls: number;
   purchases: number;
   selectedTalentIds: string[];
+  statAllocation: StatAllocation;
 }
 
 const DEFAULT_CLASS_ID: HeroClassId = "berserker";
@@ -41,6 +53,7 @@ export function createInitialCampaign(): CampaignState {
     shopRerolls: 0,
     purchases: 0,
     selectedTalentIds: [],
+    statAllocation: { ...EMPTY_ALLOCATION },
   };
 }
 
@@ -243,6 +256,7 @@ export function restoreCampaign(value: unknown): CampaignState {
     shopRerolls: clampInteger(candidate.shopRerolls, 0, Number.MAX_SAFE_INTEGER, initial.shopRerolls),
     purchases: clampInteger(candidate.purchases, 0, Number.MAX_SAFE_INTEGER, initial.purchases),
     selectedTalentIds: filterTalentIdsForClass(selectedTalentIds, selectedClassId),
+    statAllocation: restoreAllocation(candidate.statAllocation, clampInteger(candidate.heroLevel, 1, MAX_HERO_LEVEL, initial.heroLevel)),
   };
 }
 
@@ -297,7 +311,11 @@ function isLootItem(value: unknown): value is LootItem {
     (candidate.slot === "weapon" || candidate.slot === "armor" || candidate.slot === "trinket") &&
     typeof candidate.itemLevel === "number" &&
     Array.isArray(candidate.modifiers) &&
-    candidate.modifiers.every(isLootModifier)
+    candidate.modifiers.every(isLootModifier) &&
+    (candidate.upgradeLevel === undefined ||
+      (typeof candidate.upgradeLevel === "number" && Number.isFinite(candidate.upgradeLevel) && candidate.upgradeLevel >= 0)) &&
+    (candidate.rerolls === undefined ||
+      (typeof candidate.rerolls === "number" && Number.isFinite(candidate.rerolls) && candidate.rerolls >= 0))
   );
 }
 
@@ -338,4 +356,29 @@ function restoreEquipment(value: unknown): Equipment {
 
 function restoreEquipmentSlot(value: unknown, slot: EquipmentSlot): LootItem | null {
   return isLootItem(value) && value.slot === slot ? value : null;
+}
+
+function restoreAllocation(value: unknown, heroLevel: number): StatAllocation {
+  const allocation: StatAllocation = { ...EMPTY_ALLOCATION };
+
+  if (value && typeof value === "object") {
+    const candidate = value as Partial<Record<AllocatableStat, unknown>>;
+    for (const stat of ALLOCATABLE_STATS) {
+      allocation[stat] = clampInteger(candidate[stat], 0, Number.MAX_SAFE_INTEGER, 0);
+    }
+  }
+
+  // Clamp total down to the current budget, trimming from the end deterministically.
+  const budget = getStatPointBudget(heroLevel);
+  let overflow = getAllocatedPointCount(allocation) - budget;
+  if (overflow > 0) {
+    for (let i = ALLOCATABLE_STATS.length - 1; i >= 0 && overflow > 0; i -= 1) {
+      const stat = ALLOCATABLE_STATS[i];
+      const reduce = Math.min(allocation[stat], overflow);
+      allocation[stat] -= reduce;
+      overflow -= reduce;
+    }
+  }
+
+  return allocation;
 }

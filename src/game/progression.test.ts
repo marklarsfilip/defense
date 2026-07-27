@@ -302,6 +302,34 @@ describe("shop reducers", () => {
   });
 });
 
+describe("stat allocation migration", () => {
+  it("initializes an empty allocation", () => {
+    expect(createInitialCampaign().statAllocation).toEqual({ health: 0, damage: 0, armor: 0, abilityPower: 0, critChance: 0 });
+  });
+
+  it("restores and sanitizes allocation, dropping unknown keys and clamping to budget", () => {
+    const restored = restoreCampaign({
+      heroLevel: 3, // budget = (3-1)*2 = 4
+      statAllocation: { damage: 3, health: 10, bogus: 5, armor: -2 },
+    });
+    const a = restored.statAllocation;
+    expect(a.armor).toBe(0); // negative floored
+    expect(Object.keys(a).sort()).toEqual(["abilityPower", "armor", "critChance", "damage", "health"]); // no 'bogus'
+    expect(a.damage + a.health + a.armor + a.abilityPower + a.critChance).toBeLessThanOrEqual(4); // clamped to budget
+  });
+
+  it("defaults allocation for an old save without the field", () => {
+    expect(restoreCampaign({ gold: 5 }).statAllocation).toEqual({ health: 0, damage: 0, armor: 0, abilityPower: 0, critChance: 0 });
+  });
+
+  it("drops a persisted item whose upgradeLevel is not a number", () => {
+    const restored = restoreCampaign({
+      inventory: [{ id: "z", name: "Bad", rarity: "rare", slot: "weapon", itemLevel: 3, modifiers: [], upgradeLevel: "3" }],
+    });
+    expect(restored.inventory).toHaveLength(0);
+  });
+});
+
 describe("applyCombatRewards acquisition", () => {
   it("auto-equips a won chest item into an empty slot", () => {
     const base = createInitialCampaign();
