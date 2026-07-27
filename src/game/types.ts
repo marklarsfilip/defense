@@ -21,6 +21,8 @@ export type EquipmentSlot = "weapon" | "armor" | "trinket";
 
 export type StatKey = keyof Stats;
 
+export type AllocatableStat = "health" | "damage" | "armor" | "abilityPower" | "critChance";
+
 export interface Stats {
   health: number;
   armor: number;
