@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest";
+import {
+  MAX_UPGRADE_LEVEL,
+  canUpgrade,
+  rerollCost,
+  rerollItemModifiers,
+  upgradeCost,
+  upgradeItem,
+} from "./upgrade";
+import type { LootItem } from "./types";
+
+function item(overrides: Partial<LootItem> = {}): LootItem {
+  return {
+    id: "itm-1",
+    name: "Test Blade",
+    rarity: "rare",
+    slot: "weapon",
+    itemLevel: 5,
+    modifiers: [
+      { stat: "damage", label: "Brutal: +10 damage", amount: 10 },
+      { stat: "critChance", label: "Precise: +5% critical chance", amount: 0.05 },
+    ],
+    ...overrides,
+  };
+}
+
+describe("upgradeItem", () => {
+  it("scales modifier amounts up and bumps upgradeLevel", () => {
+    const up = upgradeItem(item());
+    expect(up.upgradeLevel).toBe(1);
+    expect(up.modifiers[0].amount).toBeGreaterThan(10);
+    expect(up.modifiers[0].label).toContain("Brutal");
+  });
+
+  it("does not upgrade past the cap", () => {
+    const maxed = item({ upgradeLevel: MAX_UPGRADE_LEVEL });
+    expect(canUpgrade(maxed)).toBe(false);
+    expect(upgradeItem(maxed)).toBe(maxed);
+  });
+});
+
+describe("rerollItemModifiers", () => {
+  it("is deterministic per (id, rerolls) and increments rerolls", () => {
+    const a = rerollItemModifiers(item());
+    const b = rerollItemModifiers(item());
+    expect(a.modifiers).toEqual(b.modifiers);
+    expect(a.rerolls).toBe(1);
+  });
+
+  it("varies across successive rerolls and resets upgradeLevel", () => {
+    const first = rerollItemModifiers(item({ upgradeLevel: 3 }));
+    const second = rerollItemModifiers(first);
+    expect(first.upgradeLevel).toBe(0);
+    expect(second.modifiers).not.toEqual(first.modifiers);
+  });
+});
+
+describe("costs", () => {
+  it("upgradeCost escalates with upgradeLevel", () => {
+    expect(upgradeCost(item({ upgradeLevel: 1 }))).toBeGreaterThan(upgradeCost(item({ upgradeLevel: 0 })));
+  });
+  it("rerollCost is flat across rerolls but scales with rarity", () => {
+    expect(rerollCost(item({ rerolls: 5 }))).toBe(rerollCost(item({ rerolls: 0 })));
+    expect(rerollCost(item({ rarity: "legendary" }))).toBeGreaterThan(rerollCost(item({ rarity: "common" })));
+  });
+});
