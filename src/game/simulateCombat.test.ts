@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { heroClasses, starterLevel } from "./content";
 import { createCampaignLevel } from "./levels";
 import { simulateCombat } from "./simulateCombat";
+import type { AbilityDefinition, HeroClass, LevelDefinition } from "./types";
 
 describe("simulateCombat", () => {
   it("makes level 1 winnable for every starter class", () => {
@@ -36,5 +37,72 @@ describe("simulateCombat", () => {
 
     expect(meleeResult.enemiesDefeated).toBeGreaterThan(0);
     expect(rangerResult.enemiesDefeated).toBeGreaterThan(meleeResult.enemiesDefeated);
+  });
+});
+
+function loneLevel(_ability: unknown, durationLimit = 20): LevelDefinition {
+  return {
+    id: "test-lone", name: "Test", subtitle: "", kind: "normal", levelNumber: 1,
+    enemyWaves: [{ enemyId: "graveBrute", count: 1, startsAt: 0, interval: 1, gate: "north" }],
+    durationLimit, seed: 7,
+    chest: { itemLevel: 1, rarityWeights: { common: 1, uncommon: 0, rare: 0, epic: 0, legendary: 0, set: 0 }, goldBonus: { min: 0, max: 0 } },
+    combat: { enemyHealthMultiplier: 1, enemyDamageMultiplier: 1, rewardMultiplier: 1, heroDamageMultipliers: {} },
+    notes: [],
+  };
+}
+
+function bareHero(overrides: Partial<HeroClass>, abilities: AbilityDefinition[]): HeroClass {
+  return {
+    id: "berserker", name: "T", fantasy: "", combatStyle: "", color: "#fff", damageKind: "melee",
+    stats: { health: 500, armor: 0, damage: 10, attackSpeed: 0.0001, range: 2, critChance: 0, critDamage: 1, abilityPower: 0, cooldownReduction: 0 },
+    abilities,
+    ...overrides,
+  } as HeroClass;
+}
+
+const TANKY = { enemyHealthMultiplier: 100000, enemyDamageMultiplier: 0, rewardMultiplier: 1, heroDamageMultipliers: {} };
+const STATS = (o: Partial<import("./types").Stats>): import("./types").Stats => ({
+  health: 500, armor: 0, damage: 10, attackSpeed: 0.0001, range: 2, critChance: 0, critDamage: 1, abilityPower: 0, cooldownReduction: 0, ...o,
+});
+
+describe("ability effects", () => {
+  it("damage ability hits up to `targets` living enemies", () => {
+    const level: LevelDefinition = { ...loneLevel(null), enemyWaves: [{ enemyId: "rotImp", count: 5, startsAt: 0, interval: 0, gate: "north" }], combat: { ...TANKY } };
+    const ability: AbilityDefinition = { id: "nova", name: "Nova", description: "", cooldown: 2, effect: { kind: "damage", targets: 5, damageMultiplier: 1, apScaling: 1 } };
+    const result = simulateCombat(bareHero({ stats: STATS({ damage: 5 }) }, [ability]), level);
+    const casts = result.events.filter((e) => e.type === "abilityCast");
+    expect(casts.length).toBeGreaterThan(0);
+    expect((casts[0] as Extract<typeof casts[number], { type: "abilityCast" }>).targetIds.length).toBe(5);
+  });
+
+  it("buff makes the hero attack faster while active", () => {
+    const level: LevelDefinition = { ...loneLevel(null, 12), combat: { ...TANKY } };
+    const countAttacks = (h: HeroClass) => simulateCombat(h, level).events.filter((e) => e.type === "attack").length;
+    const noBuff = countAttacks(bareHero({ stats: STATS({ attackSpeed: 1 }) }, []));
+    const withBuff = countAttacks(bareHero({ stats: STATS({ attackSpeed: 1 }) }, [
+      { id: "rage", name: "Rage", description: "", cooldown: 3, effect: { kind: "buff", duration: 10, modifiers: { attackSpeed: 3 } } },
+    ]));
+    expect(withBuff).toBeGreaterThan(noBuff);
+  });
+
+  it("shield absorbs enemy damage before health", () => {
+    const level: LevelDefinition = { ...loneLevel(null, 12), combat: { enemyHealthMultiplier: 100000, enemyDamageMultiplier: 1, rewardMultiplier: 1, heroDamageMultipliers: {} } };
+    const heroNoShield = bareHero({ stats: STATS({ health: 8, damage: 1 }) }, []);
+    const heroShield = bareHero({ stats: STATS({ health: 8, damage: 1 }) }, [
+      { id: "wall", name: "Wall", description: "", cooldown: 1, effect: { kind: "shield", amount: 500, apScaling: 0, duration: 30 } },
+    ]);
+    const a = simulateCombat(heroNoShield, level);
+    const b = simulateCombat(heroShield, level);
+    expect(a.won).toBe(false);
+    expect(b.heroHealthRemaining).toBeGreaterThan(a.heroHealthRemaining);
+  });
+
+  it("summon deals periodic ticks over its duration", () => {
+    const level: LevelDefinition = { ...loneLevel(null, 20), combat: { ...TANKY } };
+    const hero = bareHero({ stats: STATS({ damage: 1 }) }, [
+      { id: "pets", name: "Pets", description: "", cooldown: 100, effect: { kind: "summon", dps: 50, apScaling: 0, interval: 1, duration: 4 } },
+    ]);
+    const ticks = simulateCombat(hero, level).events.filter((e) => e.type === "summonTick");
+    expect(ticks.length).toBeGreaterThanOrEqual(3);
   });
 });
