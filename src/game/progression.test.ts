@@ -188,6 +188,31 @@ describe("campaign state migration", () => {
     expect(restored.equipment.weapon).toEqual(item);
   });
 
+  it("keeps an equipped item with a valid finite modifier on restore", () => {
+    const item = {
+      id: "w2",
+      name: "Modded Axe",
+      rarity: "rare",
+      slot: "weapon",
+      itemLevel: 4,
+      modifiers: [{ stat: "damage", label: "Sharp: +5", amount: 5 }],
+    };
+    const restored = restoreCampaign({ equipment: { weapon: item, armor: null, trinket: null } });
+    expect(restored.equipment.weapon).toEqual(item);
+  });
+
+  it("drops an equipped item whose modifier amount is not a finite number", () => {
+    const restored = restoreCampaign({
+      equipment: {
+        weapon: { id: "x", name: "Corrupt", rarity: "rare", slot: "weapon", itemLevel: 3, modifiers: [{ stat: "damage", label: "bad", amount: "5" }] },
+        armor: null, trinket: null,
+      },
+      inventory: [{ id: "y", name: "CorruptInv", rarity: "rare", slot: "armor", itemLevel: 3, modifiers: [{ stat: "health", label: "bad", amount: null }] }],
+    });
+    expect(restored.equipment.weapon).toBeNull();
+    expect(restored.inventory).toHaveLength(0);
+  });
+
   it("degrades non-object equipment values to empty equipment", () => {
     const empty = { weapon: null, armor: null, trinket: null };
     expect(restoreCampaign({ equipment: [] }).equipment).toEqual(empty);

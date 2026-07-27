@@ -296,7 +296,18 @@ function isLootItem(value: unknown): value is LootItem {
     isLootRarity(candidate.rarity) &&
     (candidate.slot === "weapon" || candidate.slot === "armor" || candidate.slot === "trinket") &&
     typeof candidate.itemLevel === "number" &&
-    Array.isArray(candidate.modifiers)
+    Array.isArray(candidate.modifiers) &&
+    candidate.modifiers.every(isLootModifier)
+  );
+}
+
+function isLootModifier(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const m = value as { stat?: unknown; amount?: unknown; label?: unknown };
+  return (
+    typeof m.stat === "string" &&
+    typeof m.amount === "number" &&
+    Number.isFinite(m.amount)
   );
 }
 
