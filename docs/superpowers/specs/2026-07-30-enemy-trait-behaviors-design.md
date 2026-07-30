@@ -268,8 +268,23 @@ New `src/game/traits.test.ts` — unit tests over the pure resolvers:
   damage from casters than its armor value would predict.
 - `traitEffect` events are emitted at most once per enemy per trait.
 
-Balance sweep (a test, not a manual step): every campaign level from 1 to 30 is
-winnable by at least one class, and no level is winnable by only one class.
+Balance harness (`src/game/balance.ts`, a test, not a manual step): balance is
+measured as **required gear power** — the smallest uniform multiplier on health,
+damage, armor and ability power at which a build clears a level. A win/loss
+matrix at base stats was tried first and rejected: the campaign assumes gear, so
+at base stats levels 4, 7, 8, 11 and 12 are unwinnable by every class and the
+metric carries no information past level 3.
+
+The measured pre-change baseline lives in
+`docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`. It establishes
+that three of the current `heroDamageMultipliers` point the wrong way: armored
+levels favour chip damage over big hits (Shield Line: fast-weak 2.40× vs
+slow-heavy 4.25×), armor is the better answer to casters than health (Lantern
+Storm: 2.55× vs 2.80×), and Rot Tide is the Arcanist's worst level in the
+campaign at 4.00× despite handing magic a 1.2× bonus and advertising "Area
+damage favored". Those three inversions are the re-tune's targets, and the
+guardrails also cap per-level spread (worst class within 2× the median) and
+forbid difficulty inflation (median within 20% of baseline).
 
 ## Verification
 
