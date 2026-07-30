@@ -126,11 +126,30 @@ by `src/game/balance.ts` and `npx vitest run traitBalance --reporter=verbose`.
 
 ### Guardrail results (`npm test -- traitBalance`)
 
-8 tests, 6 passed, 2 failed.
+**Fixture correction:** the first measurement of this section used
+`armor-stack` (armor 30, health 150) vs `health-stack` (armor 6, health 270),
+copied verbatim from the task brief. Those are not an equal budget: at the
+game's own `STAT_POINT_INCREMENTS` conversion rate (`src/game/allocation.ts`:
+health 12/point, armor 1/point) from the shared base of armor 10 / health
+200, `armor-stack` spends ~15.8 points and `health-stack` spends ~1.8 points —
+armor-stack was simply better funded. The reported "armor is still strictly
+better against casters" result was therefore a fixture defect, not a balance
+gap: it never measured counterplay, only which fixture had the bigger budget.
+
+The fixture was corrected to an equal 20-point spend from the shared base:
+`ARMOR_STACK` = armor 30, health 200 (20 points into armor); `HEALTH_STACK` =
+armor 10, health 440 (20 points into health, 20 × 12 = 240). A new control
+assertion pins this equality: on a non-caster level (8, Restless Dead), both
+builds must require exactly equal power, since defensive shape shouldn't
+matter there at all. All numbers below are measured with the corrected
+fixture.
+
+9 tests, 8 passed, 1 failed.
 
 - PASS `armored counterplay > makes big hits the answer on Shield Line, inverting the baseline` — slow-heavy 4.95 < fast-weak 5.10.
 - PASS `armored counterplay > makes big hits the answer on Grave March, where the baseline was noise` — slow-heavy 1.95 < fast-weak 3.40 × 0.9 (3.06).
-- **FAIL** `caster counterplay > makes health a better answer than armor, inverting the baseline` — expected health-stack < armor-stack, got health-stack 3.85 vs armor-stack 3.20 (armor is still strictly better against casters).
+- PASS `caster counterplay > makes health a better answer than armor, inverting the baseline` — health-stack 2.55 < armor-stack 2.85 (corrected fixture; inverts correctly).
+- PASS `caster counterplay > requires equal power from both defensive builds on a non-caster level, proving the budgets are equalised` — armor-stack 2.85 == health-stack 2.85 on level 8 (Restless Dead).
 - PASS `swarm counterplay > keeps multi-target ahead of single-target on Rot Tide` — spread 1.55 < focused 3.70.
 - PASS `campaign balance > keeps level 1 clearable by every class with no gear at all`.
 - PASS `campaign balance > keeps the worst class within twice the median on every early level`.
@@ -138,20 +157,22 @@ by `src/game/balance.ts` and `npx vitest run traitBalance --reporter=verbose`.
 - PASS `campaign balance > leaves every class able to kill something on every early level`.
 
 **Deviation from the brief's prediction:** the brief anticipated three failing
-inversion tests (armored ×2, caster ×1). In this measurement only one
-inversion test fails (caster); both armored inversions already pass. This is
-because the plating mechanic wired in Tasks 1-5 is a flat post-armor
-subtraction, which already structurally favours big hits over chip damage
-(a fixed subtraction removes a much larger fraction of a small hit than a
-large one) — independent of any `content.ts`/`levels.ts` numbers. The
-caster inversion still fails because nothing in the sim lets armor stop
-mattering fast enough relative to raw health for a caster fight, and the
-Shield Line median failure is new: fixing the armored counterplay pushed
-Shield Line's overall difficulty up (median 3.40 vs baseline 2.40), past the
-+20% ceiling (2.88), because the trait teeth that reward `slow-heavy` did not
-proportionally cheapen the level for classes with more balanced builds. Task 7
-must address both: invert the caster result and bring Shield Line's median
-back down.
+inversion tests (armored ×2, caster ×1). With the corrected fixture, zero
+inversion tests fail. The armored inversions already passed even before the
+fixture fix, because the `plating` mechanic wired in Tasks 1-5 is a flat
+post-armor subtraction, which already structurally favours big hits over chip
+damage (a fixed subtraction removes a much larger fraction of a small hit
+than a large one) — independent of any `content.ts`/`levels.ts` numbers. The
+caster inversion, once measured on an equal-budget fixture, also already
+passes: health beats armor against casters (2.55 vs 2.85) because the
+`armorPierce: 0.7` rule on the caster trait already lets spellfire bypass
+most of the armor-stack's defensive investment. The one remaining failure —
+the Shield Line (level 7) median ceiling — is a genuine balance gap, not a
+fixture artifact: fixing armored counterplay pushed Shield Line's overall
+difficulty up (median 3.40 vs baseline 2.40), past the +20% ceiling (2.88),
+because the trait teeth that reward `slow-heavy` did not proportionally
+cheapen the level for classes with more balanced builds. Task 7 must bring
+this median back down without undoing the now-passing armored inversions.
 
 ### Full class matrix (required power per class per level)
 
@@ -179,11 +200,12 @@ back down.
 | fast-weak vs slow-heavy | 6 | Rot Tide | 1.45 | >12 |
 | fast-weak vs slow-heavy | 7 | Shield Line | 5.10 | 4.95 |
 | fast-weak vs slow-heavy | 10 | The Gate Titan | 1.05 | 1.05 |
-| armor-stack vs health-stack | 4 | Grave March | 3.85 | 3.85 |
-| armor-stack vs health-stack | 5 | Lantern Storm | 3.20 | 3.85 |
-| armor-stack vs health-stack | 6 | Rot Tide | >12 | >12 |
-| armor-stack vs health-stack | 7 | Shield Line | 9.85 | 9.85 |
-| armor-stack vs health-stack | 10 | The Gate Titan | 2.05 | 2.05 |
+| armor-stack vs health-stack (corrected, equal 20-pt budget) | 4 | Grave March | 3.85 | 3.85 |
+| armor-stack vs health-stack (corrected, equal 20-pt budget) | 5 | Lantern Storm | 2.85 | 2.55 |
+| armor-stack vs health-stack (corrected, equal 20-pt budget) | 6 | Rot Tide | >12 | >12 |
+| armor-stack vs health-stack (corrected, equal 20-pt budget) | 7 | Shield Line | 9.85 | 9.85 |
+| armor-stack vs health-stack (corrected, equal 20-pt budget) | 8 | Restless Dead (non-caster control) | 2.85 | 2.85 |
+| armor-stack vs health-stack (corrected, equal 20-pt budget) | 10 | The Gate Titan | 2.05 | 2.05 |
 | spread vs focused | 4 | Grave March | 2.35 | 3.15 |
 | spread vs focused | 5 | Lantern Storm | 2.55 | 2.55 |
 | spread vs focused | 6 | Rot Tide | 1.55 | 3.70 |
@@ -196,11 +218,14 @@ Notes on this table:
   original baseline (4.25/2.40, slow-heavy worse) to 4.95/5.10 (slow-heavy
   better), confirming the plating mechanic works as intended, though the gap
   is narrower than on Grave March.
-- `armor-stack` vs `health-stack` is unchanged/tied on levels 4, 6, 7 and 10
-  for the same structural reason noted in the Original section (those
-  thresholds are set by damage output, not defensive shape); level 5
-  (Lantern Storm, the caster level) is the only discriminating level, and it
-  still favours armor (3.20 vs 3.85) — the still-failing guardrail.
+- `armor-stack` vs `health-stack`, on the corrected equal-budget fixture, is
+  tied on levels 4, 6, 7 and 10 for the same structural reason noted in the
+  Original section (those thresholds are set by damage output, not defensive
+  shape), and now also tied on level 8 (Restless Dead, the non-caster
+  control), confirming defensive shape only matters where the caster trait's
+  armor pierce is in play. Level 5 (Lantern Storm, the caster level) is the
+  only discriminating level, and health now correctly wins (2.55 vs 2.85) —
+  this guardrail passes with the corrected fixture.
 - `spread` vs `focused` on Rot Tide widened from 1.55/2.65 to 1.55/3.70,
   matching the brief's expectation that pack scaling would widen the existing
   correct gap.

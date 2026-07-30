@@ -7,6 +7,7 @@ const BRUTE_LEVEL = 4;
 const CASTER_LEVEL = 5;
 const SWARM_LEVEL = 6;
 const SHIELD_LEVEL = 7;
+const NON_CASTER_CONTROL_LEVEL = 8;
 
 /** Measured on untouched code at commit 70ff484. See the baseline document. */
 const BASELINE_MEDIAN: Record<number, number> = {
@@ -42,9 +43,15 @@ function shapedHero(name: string, stats: Partial<Stats>, abilities: HeroClass["a
 const FAST_WEAK = shapedHero("fast-weak", { damage: 10, attackSpeed: 4 });
 const SLOW_HEAVY = shapedHero("slow-heavy", { damage: 40, attackSpeed: 1 });
 
-// Equal defensive budget spent two ways.
-const ARMOR_STACK = shapedHero("armor-stack", { armor: 30, health: 150 });
-const HEALTH_STACK = shapedHero("health-stack", { armor: 6, health: 270 });
+// Equal defensive budget spent two ways: an equal 20-point spend from the
+// shared base (armor 10, health 200), at STAT_POINT_INCREMENTS rates of
+// health 12/pt and armor 1/pt (src/game/allocation.ts) — 20 points into armor
+// is +20 armor, 20 points into health is +240 health. Do not "tidy" these
+// numbers without re-deriving the point spend; an armor/health pair that
+// isn't equalised this way silently turns the caster test into a raw-power
+// comparison instead of a counterplay one.
+const ARMOR_STACK = shapedHero("armor-stack", { armor: 30, health: 200 });
+const HEALTH_STACK = shapedHero("health-stack", { armor: 10, health: 440 });
 
 // Equal ability budget, spread across many targets or concentrated on one.
 const SPREAD = shapedHero("spread", {}, [
@@ -79,6 +86,15 @@ describe("caster counterplay", () => {
   it("makes health a better answer than armor, inverting the baseline", () => {
     // Baseline: armor-stack 2.55, health-stack 2.80 — armor was strictly better.
     expect(power(HEALTH_STACK, CASTER_LEVEL)).toBeLessThan(power(ARMOR_STACK, CASTER_LEVEL));
+  });
+
+  it("requires equal power from both defensive builds on a non-caster level, proving the budgets are equalised", () => {
+    // Restless Dead has no caster trait, so defensive shape shouldn't matter at
+    // all here — only raw budget does. Equal result pins the fixture's budget
+    // equality as an invariant: if a future edit unbalances armor-stack vs
+    // health-stack again, this fails loudly instead of the caster test above
+    // quietly becoming a raw-power comparison.
+    expect(power(ARMOR_STACK, NON_CASTER_CONTROL_LEVEL)).toBe(power(HEALTH_STACK, NON_CASTER_CONTROL_LEVEL));
   });
 });
 
