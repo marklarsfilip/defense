@@ -147,3 +147,47 @@ export function resolveHeroDamage(input: HeroDamageInput): ResolvedDamage {
 
   return { damage: Math.max(1, Math.round(mitigated - input.plating)), appliedTraits: [...applied] };
 }
+
+export interface EnemyDamageInput {
+  rawDamage: number;
+  traits: EnemyTrait[];
+  heroArmor: number;
+  livingSwarmCount: number;
+}
+
+export function resolveEnemyDamage(input: EnemyDamageInput): ResolvedDamage {
+  const applied = new Set<EnemyTrait>();
+  let multiplier = 1;
+  let armorPierce = 0;
+
+  for (const trait of input.traits) {
+    const rule = traitRules[trait];
+
+    if (rule.damageAmplifier !== undefined) {
+      multiplier *= rule.damageAmplifier;
+      applied.add(trait);
+    }
+
+    // Only credit the pierce when the hero actually has armor to bypass, so the
+    // combat log never claims a trait mattered when it changed nothing.
+    if (rule.armorPierce !== undefined && input.heroArmor > 0) {
+      armorPierce = Math.max(armorPierce, rule.armorPierce);
+      applied.add(trait);
+    }
+
+    if (rule.pack !== undefined) {
+      const allies = packAllies(rule.pack, input.livingSwarmCount);
+      if (allies > 0) {
+        multiplier *= 1 + allies * rule.pack.damagePerAlly;
+        applied.add(trait);
+      }
+    }
+  }
+
+  const effectiveArmor = input.heroArmor * (1 - Math.min(1, armorPierce));
+
+  return {
+    damage: Math.max(1, Math.round(mitigateByArmor(input.rawDamage * multiplier, effectiveArmor))),
+    appliedTraits: [...applied],
+  };
+}

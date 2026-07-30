@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeEnemyTraits, describeTrait, enemyPlating, hasTraitRule, mitigateByArmor, resolveHeroDamage, traitRules } from "./traits";
+import { describeEnemyTraits, describeTrait, enemyPlating, hasTraitRule, mitigateByArmor, resolveEnemyDamage, resolveHeroDamage, traitRules } from "./traits";
 import type { EnemyTrait } from "./types";
 
 const ALL_TRAITS: EnemyTrait[] = [
@@ -124,5 +124,46 @@ describe("resolveHeroDamage", () => {
     });
 
     expect(resolved.damage).toBe(1);
+  });
+});
+
+const ENEMY_HIT = {
+  rawDamage: 100,
+  traits: [] as EnemyTrait[],
+  heroArmor: 0,
+  livingSwarmCount: 0,
+};
+
+describe("resolveEnemyDamage", () => {
+  it("mitigates by hero armor when no trait applies", () => {
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["ground"], heroArmor: 20 }).damage)
+      .toBe(Math.round(mitigateByArmor(100, 20)));
+  });
+
+  it("doubles the strike for dangerous enemies", () => {
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["dangerous"] }).damage).toBe(200);
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["dangerous"] }).appliedTraits).toEqual(["dangerous"]);
+  });
+
+  it("ignores 70% of hero armor for casters", () => {
+    const pierced = resolveEnemyDamage({ ...ENEMY_HIT, traits: ["caster"], heroArmor: 20 }).damage;
+
+    expect(pierced).toBe(Math.round(mitigateByArmor(100, 20 * 0.3)));
+    expect(pierced).toBeGreaterThan(Math.round(mitigateByArmor(100, 20)));
+  });
+
+  it("does not claim armor pierce against an unarmored hero", () => {
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["caster"], heroArmor: 0 }).appliedTraits).toEqual([]);
+  });
+
+  it("raises swarm damage with packmates and clamps at the cap", () => {
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["swarm"], livingSwarmCount: 1 }).damage).toBe(100);
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["swarm"], livingSwarmCount: 3 }).damage).toBe(120);
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["swarm"], livingSwarmCount: 7 }).damage).toBe(160);
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["swarm"], livingSwarmCount: 20 }).damage).toBe(160);
+  });
+
+  it("never resolves an enemy hit below 1 damage", () => {
+    expect(resolveEnemyDamage({ ...ENEMY_HIT, rawDamage: 1, traits: ["ground"], heroArmor: 500 }).damage).toBe(1);
   });
 });
