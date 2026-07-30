@@ -424,7 +424,8 @@ export function App() {
                     event.type === "attack" ||
                     event.type === "death" ||
                     event.type === "levelComplete" ||
-                    event.type === "abilityCast",
+                    event.type === "abilityCast" ||
+                    event.type === "traitEffect",
                 )
                 .slice(-7)
                 .map((event, index) => (
@@ -434,6 +435,7 @@ export function App() {
                     {event.type === "death" && `${event.enemyId} collapsed`}
                     {event.type === "levelComplete" && `Level complete: ${event.gold} gold`}
                     {event.type === "abilityCast" && `Cast ${event.label}`}
+                    {event.type === "traitEffect" && `${event.enemyName} ${event.message}`}
                   </li>
                 ))}
             </ol>

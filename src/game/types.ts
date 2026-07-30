@@ -325,6 +325,14 @@ export type CombatEvent =
       abilityId: string;
       targetId: string;
       damage: number;
+    }
+  | {
+      type: "traitEffect";
+      time: number;
+      enemyId: string;
+      enemyName: string;
+      trait: EnemyTrait;
+      message: string;
     };
 
 export interface CombatResult {

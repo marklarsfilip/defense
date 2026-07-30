@@ -45,6 +45,20 @@ describe("simulateCombat", () => {
     expect(rangerResult.duration).toBeLessThan(meleeResult.duration);
     expect(rangerResult.heroHealthRemaining).toBeGreaterThan(meleeResult.heroHealthRemaining);
   });
+
+  it("announces each trait once per enemy so the log explains the fight", () => {
+    const bruteLevel = createCampaignLevel(4);
+    const berserker = heroClasses.find((heroClass) => heroClass.id === "berserker")!;
+    const result = simulateCombat(berserker, bruteLevel);
+    const traitEvents = result.events.filter((event) => event.type === "traitEffect");
+
+    expect(traitEvents.length).toBeGreaterThan(0);
+    expect(traitEvents.some((event) => event.trait === "armored")).toBe(true);
+
+    const keys = traitEvents.map((event) => `${event.enemyId}:${event.trait}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(traitEvents.every((event) => event.message.length > 0)).toBe(true);
+  });
 });
 
 function loneLevel(_ability: unknown, durationLimit = 20): LevelDefinition {
