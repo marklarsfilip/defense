@@ -16,7 +16,7 @@ describe("levels", () => {
     const normalLevel = createCampaignLevel(11);
 
     expect(bossLevel.kind).toBe("boss");
-    expect(bossLevel.enemyWaves).toHaveLength(1);
+    expect(bossLevel.enemyWaves.length).toBeGreaterThan(1);
     expect(bossLevel.enemyWaves[0].enemyId).toBe("gateTitan");
     expect(normalLevel.kind).toBe("normal");
   });
@@ -48,7 +48,7 @@ describe("levels", () => {
 
     expect(flyingLevel.notes).toContain("Melee uses weak thrown attacks");
     expect(flyingLevel.enemyWaves.every((wave) => wave.enemyId === "boneHawk")).toBe(true);
-    expect(glassLevel.notes).toContain("Melee burst favored");
+    expect(glassLevel.notes).toContain("Fragile but deadly");
     expect(glassLevel.enemyWaves.every((wave) => wave.enemyId === "glassCultist")).toBe(true);
     expect(casterLevel.enemyWaves.every((wave) => wave.enemyId === "spellWisp")).toBe(true);
     expect(swarmLevel.enemyWaves.every((wave) => wave.enemyId === "rotImp")).toBe(true);
