@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { STAT_POINT_INCREMENTS } from "./allocation";
 import { heroClasses } from "./content";
 import { medianPower, requiredPower, requiredPowerByClass } from "./balance";
 import type { HeroClass, Stats } from "./types";
@@ -7,7 +8,6 @@ const BRUTE_LEVEL = 4;
 const CASTER_LEVEL = 5;
 const SWARM_LEVEL = 6;
 const SHIELD_LEVEL = 7;
-const NON_CASTER_CONTROL_LEVEL = 8;
 
 /** Measured on untouched code at commit 70ff484. See the baseline document. */
 const BASELINE_MEDIAN: Record<number, number> = {
@@ -44,14 +44,29 @@ const FAST_WEAK = shapedHero("fast-weak", { damage: 10, attackSpeed: 4 });
 const SLOW_HEAVY = shapedHero("slow-heavy", { damage: 40, attackSpeed: 1 });
 
 // Equal defensive budget spent two ways: an equal 20-point spend from the
-// shared base (armor 10, health 200), at STAT_POINT_INCREMENTS rates of
-// health 12/pt and armor 1/pt (src/game/allocation.ts) — 20 points into armor
-// is +20 armor, 20 points into health is +240 health. Do not "tidy" these
-// numbers without re-deriving the point spend; an armor/health pair that
-// isn't equalised this way silently turns the caster test into a raw-power
-// comparison instead of a counterplay one.
-const ARMOR_STACK = shapedHero("armor-stack", { armor: 30, health: 200 });
-const HEALTH_STACK = shapedHero("health-stack", { armor: 10, health: 440 });
+// shared base below, at the game's own STAT_POINT_INCREMENTS rates
+// (src/game/allocation.ts). The fixtures are built from DEFENSIVE_BASE and
+// DEFENSIVE_BUDGET_POINTS rather than hardcoded stats, and
+// "spend an equal stat-point budget" below re-derives the same numbers and
+// asserts them equal, so base and fixtures cannot drift apart unnoticed.
+const DEFENSIVE_BASE: Pick<Stats, "armor" | "health"> = { armor: 10, health: 200 };
+const DEFENSIVE_BUDGET_POINTS = 20;
+const ARMOR_STACK = shapedHero("armor-stack", {
+  armor: DEFENSIVE_BASE.armor + DEFENSIVE_BUDGET_POINTS * STAT_POINT_INCREMENTS.armor,
+  health: DEFENSIVE_BASE.health,
+});
+const HEALTH_STACK = shapedHero("health-stack", {
+  armor: DEFENSIVE_BASE.armor,
+  health: DEFENSIVE_BASE.health + DEFENSIVE_BUDGET_POINTS * STAT_POINT_INCREMENTS.health,
+});
+
+/** Stat points spent on armor + health relative to DEFENSIVE_BASE, at real allocation rates. */
+function defensivePointCost(stats: Pick<Stats, "armor" | "health">): number {
+  return (
+    (stats.armor - DEFENSIVE_BASE.armor) / STAT_POINT_INCREMENTS.armor +
+    (stats.health - DEFENSIVE_BASE.health) / STAT_POINT_INCREMENTS.health
+  );
+}
 
 // Equal ability budget, spread across many targets or concentrated on one.
 const SPREAD = shapedHero("spread", {}, [
@@ -60,6 +75,16 @@ const SPREAD = shapedHero("spread", {}, [
 const FOCUSED = shapedHero("focused", {}, [
   { id: "stab", name: "Stab", description: "", cooldown: 4, effect: { kind: "damage", targets: 1, damageMultiplier: 5, apScaling: 0 } },
 ]);
+
+/** Total per-cast damage budget (targets x multiplier) of a hero's first ability. */
+function abilityDamageBudget(hero: HeroClass): number {
+  const effect = hero.abilities[0].effect;
+  if (effect.kind !== "damage") {
+    throw new Error(`${hero.name}'s ability is not a damage effect`);
+  }
+
+  return effect.targets * effect.damageMultiplier;
+}
 
 /** Fails loudly rather than comparing against null. */
 function power(hero: HeroClass, levelNumber: number): number {
@@ -88,13 +113,16 @@ describe("caster counterplay", () => {
     expect(power(HEALTH_STACK, CASTER_LEVEL)).toBeLessThan(power(ARMOR_STACK, CASTER_LEVEL));
   });
 
-  it("requires equal power from both defensive builds on a non-caster level, proving the budgets are equalised", () => {
-    // Restless Dead has no caster trait, so defensive shape shouldn't matter at
-    // all here — only raw budget does. Equal result pins the fixture's budget
-    // equality as an invariant: if a future edit unbalances armor-stack vs
-    // health-stack again, this fails loudly instead of the caster test above
-    // quietly becoming a raw-power comparison.
-    expect(power(ARMOR_STACK, NON_CASTER_CONTROL_LEVEL)).toBe(power(HEALTH_STACK, NON_CASTER_CONTROL_LEVEL));
+  // A behavioural control (checking both builds require equal power on a
+  // non-caster level) was tried here and removed: level 8 turned out to be
+  // bottlenecked by offense, not defence, for a no-ability hero, so it stayed
+  // green (2.85 / 2.85) at any armor or health value on ARMOR_STACK — it
+  // would not have caught the exact unequal-budget bug it was meant to
+  // guard against. Do not re-add a level-based control here; assert the
+  // point-cost arithmetic directly instead, as below.
+  it("spends an equal stat-point budget on both defensive fixtures", () => {
+    expect(defensivePointCost(ARMOR_STACK.stats)).toBe(DEFENSIVE_BUDGET_POINTS);
+    expect(defensivePointCost(HEALTH_STACK.stats)).toBe(DEFENSIVE_BUDGET_POINTS);
   });
 });
 
@@ -102,6 +130,10 @@ describe("swarm counterplay", () => {
   it("keeps multi-target ahead of single-target on Rot Tide", () => {
     // Baseline: spread 1.55, focused 2.65 — already correct. Regression guard.
     expect(power(SPREAD, SWARM_LEVEL)).toBeLessThan(power(FOCUSED, SWARM_LEVEL));
+  });
+
+  it("spends an equal per-cast damage budget on both ability fixtures", () => {
+    expect(abilityDamageBudget(SPREAD)).toBe(abilityDamageBudget(FOCUSED));
   });
 });
 

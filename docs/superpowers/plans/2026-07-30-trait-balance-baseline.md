@@ -138,19 +138,39 @@ gap: it never measured counterplay, only which fixture had the bigger budget.
 
 The fixture was corrected to an equal 20-point spend from the shared base:
 `ARMOR_STACK` = armor 30, health 200 (20 points into armor); `HEALTH_STACK` =
-armor 10, health 440 (20 points into health, 20 × 12 = 240). A new control
-assertion pins this equality: on a non-caster level (8, Restless Dead), both
-builds must require exactly equal power, since defensive shape shouldn't
-matter there at all. All numbers below are measured with the corrected
-fixture.
+armor 10, health 440 (20 points into health, 20 × 12 = 240). Both fixtures
+are now built from a `DEFENSIVE_BASE` constant plus `DEFENSIVE_BUDGET_POINTS`
+at the real `STAT_POINT_INCREMENTS` rates, so base and fixtures cannot drift
+apart.
 
-9 tests, 8 passed, 1 failed.
+**Control test correction:** a first attempt at pinning this equality used a
+behavioural control — asserting both builds require exactly equal power on a
+non-caster level (8, Restless Dead). Review found this vacuous: level 8 is
+bottlenecked by offense, not defence, for a no-ability hero, so
+`requiredPower` there stays at 2.85 regardless of how much armor or health
+`ARMOR_STACK` has — the same "structurally uninformative" pattern the
+baseline document's Original section already flags for levels 4, 7 and 10.
+It would have stayed green even if the exact unequal-budget bug it was meant
+to catch were reintroduced, so it was removed. The invariant is now pinned
+directly as arithmetic instead: `defensivePointCost` recomputes each
+fixture's spend from `DEFENSIVE_BASE` and `STAT_POINT_INCREMENTS`, and a test
+asserts both fixtures cost exactly `DEFENSIVE_BUDGET_POINTS` (20). A second,
+equivalent gap was closed for the ability pair at the same time: `SPREAD` and
+`FOCUSED`'s equal per-cast damage budget (`targets × damageMultiplier` = 5
+for both) was previously only a comment; it is now an assertion via
+`abilityDamageBudget`. Do not re-add a level-based behavioural control for
+either invariant — assert the arithmetic directly, as both tests now do.
+
+All numbers below are measured with the corrected fixture.
+
+10 tests, 9 passed, 1 failed.
 
 - PASS `armored counterplay > makes big hits the answer on Shield Line, inverting the baseline` — slow-heavy 4.95 < fast-weak 5.10.
 - PASS `armored counterplay > makes big hits the answer on Grave March, where the baseline was noise` — slow-heavy 1.95 < fast-weak 3.40 × 0.9 (3.06).
 - PASS `caster counterplay > makes health a better answer than armor, inverting the baseline` — health-stack 2.55 < armor-stack 2.85 (corrected fixture; inverts correctly).
-- PASS `caster counterplay > requires equal power from both defensive builds on a non-caster level, proving the budgets are equalised` — armor-stack 2.85 == health-stack 2.85 on level 8 (Restless Dead).
+- PASS `caster counterplay > spends an equal stat-point budget on both defensive fixtures` — both fixtures cost exactly 20 points.
 - PASS `swarm counterplay > keeps multi-target ahead of single-target on Rot Tide` — spread 1.55 < focused 3.70.
+- PASS `swarm counterplay > spends an equal per-cast damage budget on both ability fixtures` — both fixtures budget exactly 5 (targets × damageMultiplier).
 - PASS `campaign balance > keeps level 1 clearable by every class with no gear at all`.
 - PASS `campaign balance > keeps the worst class within twice the median on every early level`.
 - **FAIL** `campaign balance > does not inflate difficulty: median power stays within 20% of the baseline` — level 7 (Shield Line) median is 3.40, baseline × 1.2 allows 2.88.
@@ -204,7 +224,7 @@ this median back down without undoing the now-passing armored inversions.
 | armor-stack vs health-stack (corrected, equal 20-pt budget) | 5 | Lantern Storm | 2.85 | 2.55 |
 | armor-stack vs health-stack (corrected, equal 20-pt budget) | 6 | Rot Tide | >12 | >12 |
 | armor-stack vs health-stack (corrected, equal 20-pt budget) | 7 | Shield Line | 9.85 | 9.85 |
-| armor-stack vs health-stack (corrected, equal 20-pt budget) | 8 | Restless Dead (non-caster control) | 2.85 | 2.85 |
+| armor-stack vs health-stack (corrected, equal 20-pt budget) | 8 | Restless Dead (non-caster, offense-bottlenecked — informational only, not a test) | 2.85 | 2.85 |
 | armor-stack vs health-stack (corrected, equal 20-pt budget) | 10 | The Gate Titan | 2.05 | 2.05 |
 | spread vs focused | 4 | Grave March | 2.35 | 3.15 |
 | spread vs focused | 5 | Lantern Storm | 2.55 | 2.55 |
@@ -221,11 +241,12 @@ Notes on this table:
 - `armor-stack` vs `health-stack`, on the corrected equal-budget fixture, is
   tied on levels 4, 6, 7 and 10 for the same structural reason noted in the
   Original section (those thresholds are set by damage output, not defensive
-  shape), and now also tied on level 8 (Restless Dead, the non-caster
-  control), confirming defensive shape only matters where the caster trait's
-  armor pierce is in play. Level 5 (Lantern Storm, the caster level) is the
-  only discriminating level, and health now correctly wins (2.55 vs 2.85) —
-  this guardrail passes with the corrected fixture.
+  shape), and also tied on level 8 (Restless Dead) — but level 8 is
+  offense-bottlenecked for this fixture (see the removed-control note above),
+  so that tie is not evidence either way, only a data point. Level 5 (Lantern
+  Storm, the caster level) is the only discriminating level, and health now
+  correctly wins (2.55 vs 2.85) — this guardrail passes with the corrected
+  fixture.
 - `spread` vs `focused` on Rot Tide widened from 1.55/2.65 to 1.55/3.70,
   matching the brief's expectation that pack scaling would widen the existing
   correct gap.
