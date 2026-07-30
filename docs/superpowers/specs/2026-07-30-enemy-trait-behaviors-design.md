@@ -286,6 +286,38 @@ damage favored". Those three inversions are the re-tune's targets, and the
 guardrails also cap per-level spread (worst class within 2× the median) and
 forbid difficulty inflation (median within 20% of baseline).
 
+## Outcome
+
+Measured against the final tables in
+`docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`, this slice's
+counterplay claim holds in part and does not hold in part.
+
+What holds: the *mechanism* moved. All 11 `heroDamageMultipliers` producers in
+`levels.ts` now pass `{}` — none of the class-keyed counterplay described in
+Problem remains — and that move buys a real build-shape axis on the offensive
+and ability dimensions. Level 4 (Grave March) separates fast-weak (3.00
+required power) from slow-heavy (1.70); level 6 (Rot Tide) separates spread
+(1.55) from focused (2.65). Neither gap existed at a shared budget before
+trait teeth landed.
+
+What does not hold: class identity did not recede as build shape rose — it
+remains the dominant predictor of required power, and per-level class spread
+(the ratio of the worst class's required power to the best, across the five
+classes) actually *grew* on three of the four comparable levels: level 4
+1.68×→1.82×, level 5 1.90×→2.25×, level 7 2.23×→2.24×; only level 6 fell,
+4.00×→3.80×. The defensive axis (armor-stack vs. health-stack, an equal-budget
+fixture pair) discriminates on only one of the six levels it was measured on
+— level 5, the caster level — and ties on levels 4, 6, 7, 8 and 10, because
+those levels are bottlenecked by offense rather than defense (see the balance
+baseline's notes on "structurally uninformative" pairs).
+
+The accurate framing: this slice adds a build-shape axis on the offensive and
+ability dimensions on top of class identity, which remains the dominant
+predictor of required power across the campaign. It does not move
+counterplay off class identity onto build shape, and should not be described
+that way. The mechanism change and the offensive/ability gaps it created are
+real and verified; a broader, class-displacing shift is not.
+
 ## Verification
 
 Browser-driven per the project verify skill: seed `tbd-defense:campaign` to

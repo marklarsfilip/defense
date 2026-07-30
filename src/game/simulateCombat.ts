@@ -6,7 +6,7 @@ import {
   effectiveCooldown,
   summonDamagePerTick,
 } from "./abilities";
-import { enemyPlating, resolveEnemyDamage, resolveHeroDamage, traitRules } from "./traits";
+import { resolveEnemyDamage, resolveHeroDamage, resolvePlating, traitRules } from "./traits";
 import type { AbilityDefinition, CombatEnemy, CombatEvent, CombatResult, EnemyTrait, HeroClass, LevelDefinition } from "./types";
 
 const HERO_ATTACK_WINDUP = 0.16;
@@ -130,6 +130,10 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
       const perTarget = abilityDamagePerTarget(effect, heroClass.stats.damage, heroClass.stats.abilityPower, levelDamageMultiplier);
       const swarmCount = livingSwarmCount();
       const targetIds: string[] = [];
+      // Collect trait notes and emit them once the attack event this ability cast
+      // produced is on the log, so cause (the hit) reads before effect (the trait
+      // line explaining it) — same ordering as the basic-attack site.
+      const traitNotes: { target: CombatEnemy; applied: EnemyTrait[] }[] = [];
       let lastDamage = 0;
       for (const target of targets) {
         const resolved = resolveHeroDamage({
@@ -144,7 +148,7 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         });
         const damage = resolved.damage;
         target.health = Math.max(0, target.health - damage);
-        noteTraitEffects(target, resolved.appliedTraits, time);
+        traitNotes.push({ target, applied: resolved.appliedTraits });
         lastDamage = damage;
         targetIds.push(target.id);
         events.push({
@@ -167,6 +171,9 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         damageKind: heroClass.damageKind,
         label: ability.name,
       });
+      for (const { target, applied } of traitNotes) {
+        noteTraitEffects(target, applied, time);
+      }
       return;
     }
 
@@ -243,6 +250,9 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         }
         heroHealth = Math.max(0, heroHealth - damage);
         events.push({ type: "heroHit", time: roundTime(time), sourceId: enemy.id, damage });
+        // Note trait effects before the heroHealth <= 0 early return below, so a
+        // trait that lands the killing blow (e.g. a "dangerous" double-damage hit)
+        // still reaches the combat log instead of being cut off by the return.
         noteTraitEffects(enemy, resolved.appliedTraits, time);
         if (heroHealth <= 0) {
           events.push({ type: "heroDefeated", time: roundTime(time) });
@@ -308,7 +318,7 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         const multiplier = critical ? heroClass.stats.critDamage : 1;
         const rawDamage = Math.round(baseDamage * multiplier * levelDamageMultiplier);
         const resolved = resolveHeroDamage({
-          rawDamage: rawDamage,
+          rawDamage,
           traits: target.traits,
           armor: target.armor,
           plating: target.plating,
@@ -319,7 +329,6 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         });
         const damage = resolved.damage;
         target.health = Math.max(0, target.health - damage);
-        noteTraitEffects(target, resolved.appliedTraits, time);
         events.push({
           type: "projectile",
           time: roundTime(Math.max(0, time - HERO_ATTACK_WINDUP)),
@@ -337,6 +346,7 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
           damageKind: heroClass.damageKind,
           label: basicAttackLabel(heroClass.damageKind),
         });
+        noteTraitEffects(target, resolved.appliedTraits, time);
         registerKill(target, time);
       }
       const effectiveAttackSpeed = heroClass.stats.attackSpeed + buffs.attackSpeed;
@@ -376,7 +386,7 @@ function buildEnemySpawns(level: LevelDefinition): CombatEnemy[] {
         maxHealth,
         health: maxHealth,
         armor: definition.armor,
-        plating: Math.round(enemyPlating(definition.traits) * level.combat.enemyHealthMultiplier),
+        plating: resolvePlating(definition.traits, level.combat.enemyHealthMultiplier),
         damage: Math.max(1, Math.round(definition.damage * level.combat.enemyDamageMultiplier)),
         attackSpeed: definition.attackSpeed,
         moveSpeed: definition.moveSpeed,

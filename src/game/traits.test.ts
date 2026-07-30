@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeEnemyTraits, describeTrait, enemyPlating, hasTraitRule, mitigateByArmor, resolveEnemyDamage, resolveHeroDamage, traitRules } from "./traits";
+import { describeEnemyTraits, describeTrait, enemyPlating, hasTraitRule, mitigateByArmor, resolveEnemyDamage, resolveHeroDamage, resolvePlating, traitRules } from "./traits";
 import type { EnemyTrait } from "./types";
 
 const ALL_TRAITS: EnemyTrait[] = [
@@ -48,6 +48,12 @@ describe("trait rules table", () => {
   it("describes a trait list in order", () => {
     expect(describeEnemyTraits(["ground", "armored"]).map((entry) => entry.trait)).toEqual(["ground", "armored"]);
   });
+
+  it("scales resolved plating with the level's enemy health multiplier", () => {
+    expect(resolvePlating(["ground", "armored"], 1)).toBe(9);
+    expect(resolvePlating(["ground", "armored"], 2)).toBe(18);
+    expect(resolvePlating(["ground", "flying"], 3)).toBe(0);
+  });
 });
 
 const HERO_HIT = {
@@ -67,7 +73,7 @@ describe("resolveHeroDamage", () => {
   });
 
   it("mitigates by armor before anything else reduces the hit", () => {
-    expect(resolveHeroDamage({ ...HERO_HIT, armor: 10 }).damage).toBe(Math.round(mitigateByArmor(100, 10)));
+    expect(resolveHeroDamage({ ...HERO_HIT, armor: 10 }).damage).toBe(63);
   });
 
   it("subtracts plating after armor mitigation, not before", () => {
@@ -137,7 +143,7 @@ const ENEMY_HIT = {
 describe("resolveEnemyDamage", () => {
   it("mitigates by hero armor when no trait applies", () => {
     expect(resolveEnemyDamage({ ...ENEMY_HIT, traits: ["ground"], heroArmor: 20 }).damage)
-      .toBe(Math.round(mitigateByArmor(100, 20)));
+      .toBe(45);
   });
 
   it("doubles the strike for dangerous enemies", () => {
@@ -148,7 +154,7 @@ describe("resolveEnemyDamage", () => {
   it("ignores 70% of hero armor for casters", () => {
     const pierced = resolveEnemyDamage({ ...ENEMY_HIT, traits: ["caster"], heroArmor: 20 }).damage;
 
-    expect(pierced).toBe(Math.round(mitigateByArmor(100, 20 * 0.3)));
+    expect(pierced).toBe(74);
     expect(pierced).toBeGreaterThan(Math.round(mitigateByArmor(100, 20)));
   });
 

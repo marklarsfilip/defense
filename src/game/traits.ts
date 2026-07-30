@@ -63,22 +63,23 @@ export function describeEnemyTraits(traits: EnemyTrait[]): TraitDescription[] {
   return traits.map(describeTrait);
 }
 
+// `logLine` is present on a trait rule if and only if the rule has at least one
+// mechanical knob (see traits.test.ts: "gives every rule-bearing trait a
+// combat-log line"), so it doubles as the "has a rule" marker without a second,
+// hand-maintained list of knob names that could silently drift from the table.
 export function hasTraitRule(trait: EnemyTrait): boolean {
-  const rule = traitRules[trait];
-
-  return (
-    rule.meleePenalty !== undefined ||
-    rule.critVulnerability !== undefined ||
-    rule.plating !== undefined ||
-    rule.spreadResistance !== undefined ||
-    rule.armorPierce !== undefined ||
-    rule.damageAmplifier !== undefined ||
-    rule.pack !== undefined
-  );
+  return traitRules[trait].logLine !== undefined;
 }
 
 export function enemyPlating(traits: EnemyTrait[]): number {
   return traits.reduce((total, trait) => total + (traitRules[trait].plating ?? 0), 0);
+}
+
+/** Plating scales with the level's enemy health multiplier so a flat base value
+ * doesn't become irrelevant as the campaign scales — the same policy the level
+ * applies to enemy health itself. */
+export function resolvePlating(traits: EnemyTrait[], healthMultiplier: number): number {
+  return Math.round(enemyPlating(traits) * healthMultiplier);
 }
 
 export interface HeroDamageInput {
