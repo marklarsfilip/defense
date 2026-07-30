@@ -241,6 +241,8 @@ export interface CombatEnemy {
   maxHealth: number;
   health: number;
   armor: number;
+  /** Flat post-armor damage reduction from armored-style traits, scaled by level. */
+  plating: number;
   damage: number;
   attackSpeed: number;
   moveSpeed: number;

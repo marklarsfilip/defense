@@ -6,6 +6,7 @@ import {
   effectiveCooldown,
   summonDamagePerTick,
 } from "./abilities";
+import { enemyPlating, resolveEnemyDamage, resolveHeroDamage } from "./traits";
 import type { AbilityDefinition, CombatEnemy, CombatEvent, CombatResult, HeroClass, LevelDefinition } from "./types";
 
 const HERO_ATTACK_WINDUP = 0.16;
@@ -59,6 +60,18 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
     return activeEnemies.filter((enemy) => enemy.health > 0);
   }
 
+  // Pass the raw living swarm count (including the enemy being hit) — the resolvers
+  // subtract 1 internally to get the ally count. Do not pre-subtract here.
+  function livingSwarmCount(): number {
+    let count = 0;
+    for (const enemy of activeEnemies) {
+      if (enemy.health > 0 && enemy.traits.includes("swarm")) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   function pickTargets(count: number): CombatEnemy[] {
     return livingEnemies()
       .sort((a, b) => a.spawnTime - b.spawnTime)
@@ -92,10 +105,21 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
     if (effect.kind === "damage") {
       const targets = pickTargets(effect.targets);
       const perTarget = abilityDamagePerTarget(effect, heroClass.stats.damage, heroClass.stats.abilityPower, levelDamageMultiplier);
+      const swarmCount = livingSwarmCount();
       const targetIds: string[] = [];
       let lastDamage = 0;
       for (const target of targets) {
-        const damage = mitigateDamage(Math.round(perTarget * getTargetDamageMultiplier(heroClass, target)), target.armor);
+        const resolved = resolveHeroDamage({
+          rawDamage: perTarget,
+          traits: target.traits,
+          armor: target.armor,
+          plating: target.plating,
+          damageKind: heroClass.damageKind,
+          critical: false,
+          targetsHit: targets.length,
+          livingSwarmCount: swarmCount,
+        });
+        const damage = resolved.damage;
         target.health = Math.max(0, target.health - damage);
         lastDamage = damage;
         targetIds.push(target.id);
@@ -180,7 +204,12 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
       const attackCadence = 1 / enemy.attackSpeed;
       if (time >= nextAttack) {
         nextEnemyAttack.set(enemy.id, nextAttack + attackCadence);
-        let damage = mitigateDamage(enemy.damage, heroClass.stats.armor);
+        let damage = resolveEnemyDamage({
+          rawDamage: enemy.damage,
+          traits: enemy.traits,
+          heroArmor: heroClass.stats.armor,
+          livingSwarmCount: livingSwarmCount(),
+        }).damage;
         const currentShield = getShield();
         if (currentShield && time <= currentShield.expiresAt && currentShield.amount > 0) {
           const absorbed = Math.min(currentShield.amount, damage);
@@ -203,7 +232,16 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
           summon.nextTick += summon.interval;
           continue;
         }
-        const damage = mitigateDamage(Math.round(summon.perTick * getTargetDamageMultiplier(heroClass, target)), target.armor);
+        const damage = resolveHeroDamage({
+          rawDamage: summon.perTick,
+          traits: target.traits,
+          armor: target.armor,
+          plating: target.plating,
+          damageKind: heroClass.damageKind,
+          critical: false,
+          targetsHit: 1,
+          livingSwarmCount: livingSwarmCount(),
+        }).damage;
         target.health = Math.max(0, target.health - damage);
         events.push({ type: "summonTick", time: roundTime(time), abilityId: summon.abilityId, targetId: target.id, damage });
         registerKill(target, time);
@@ -241,7 +279,16 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         const baseDamage = heroClass.stats.damage + buffs.damage + heroClass.stats.abilityPower * 0.55;
         const multiplier = critical ? heroClass.stats.critDamage : 1;
         const rawDamage = Math.round(baseDamage * multiplier * levelDamageMultiplier);
-        const damage = mitigateDamage(Math.round(rawDamage * getTargetDamageMultiplier(heroClass, target)), target.armor);
+        const damage = resolveHeroDamage({
+          rawDamage: rawDamage,
+          traits: target.traits,
+          armor: target.armor,
+          plating: target.plating,
+          damageKind: heroClass.damageKind,
+          critical,
+          targetsHit: 1,
+          livingSwarmCount: livingSwarmCount(),
+        }).damage;
         target.health = Math.max(0, target.health - damage);
         events.push({
           type: "projectile",
@@ -299,6 +346,7 @@ function buildEnemySpawns(level: LevelDefinition): CombatEnemy[] {
         maxHealth,
         health: maxHealth,
         armor: definition.armor,
+        plating: Math.round(enemyPlating(definition.traits) * level.combat.enemyHealthMultiplier),
         damage: Math.max(1, Math.round(definition.damage * level.combat.enemyDamageMultiplier)),
         attackSpeed: definition.attackSpeed,
         moveSpeed: definition.moveSpeed,
@@ -312,19 +360,6 @@ function buildEnemySpawns(level: LevelDefinition): CombatEnemy[] {
   }
 
   return spawns.sort((a, b) => a.spawnTime - b.spawnTime);
-}
-
-function mitigateDamage(rawDamage: number, armor: number): number {
-  const armorMultiplier = 100 / (100 + armor * 6);
-  return Math.max(1, Math.round(rawDamage * armorMultiplier));
-}
-
-function getTargetDamageMultiplier(heroClass: HeroClass, enemy: CombatEnemy): number {
-  if (heroClass.damageKind === "melee" && enemy.traits.includes("flying")) {
-    return 0.38;
-  }
-
-  return 1;
 }
 
 function basicAttackLabel(kind: HeroClass["damageKind"]): string {
