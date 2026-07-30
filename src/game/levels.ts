@@ -127,13 +127,16 @@ function createBossLevel(levelNumber: number): LevelDefinition {
     durationLimit: 65,
     chest: createChest(levelNumber, 1.9),
     combat: {
-      enemyHealthMultiplier: 1 + levelNumber * 0.14,
+      enemyHealthMultiplier: 1 + levelNumber * 0.13,
       enemyDamageMultiplier: 1 + levelNumber * 0.05,
       rewardMultiplier: 1.9,
       heroDamageMultipliers: {},
     },
-    notes: ["Every tenth level", "Single boss", "Higher reward chest"],
-    enemyWaves: [{ enemyId: "gateTitan", count: 1, startsAt: 0.8, interval: 1, gate: "north" }],
+    notes: ["Every tenth level", "Boss with a light escort", "Higher reward chest"],
+    enemyWaves: [
+      { enemyId: "gateTitan", count: 1, startsAt: 0.8, interval: 1, gate: "north" },
+      { enemyId: "rotImp", count: 6, startsAt: 6, interval: 6, gate: "east" },
+    ],
   };
 }
 
@@ -144,13 +147,9 @@ function createFlyingLevel(levelNumber: number): LevelDefinition {
       enemyHealthMultiplier: levelScale(levelNumber),
       enemyDamageMultiplier: 0.92 + levelNumber * 0.025,
       rewardMultiplier: 1.08,
-      heroDamageMultipliers: {
-        ranged: 1.2,
-        magic: 1.12,
-        summon: 1.08,
-      },
+      heroDamageMultipliers: {},
     },
-    notes: ["Flying enemies", "Melee uses weak thrown attacks", "Ranged and magic favored"],
+    notes: ["Flying enemies", "Melee uses weak thrown attacks"],
     enemyWaves: buildWaves("boneHawk", levelNumber, 26, 0.46),
   };
 }
@@ -160,14 +159,11 @@ function createGlassLevel(levelNumber: number): LevelDefinition {
     ...baseLevel(levelNumber, "normal", "Glass Knives", "Dangerous fragile mobs"),
     combat: {
       enemyHealthMultiplier: Math.max(0.7, levelScale(levelNumber) * 0.82),
-      enemyDamageMultiplier: 1.25 + levelNumber * 0.035,
+      enemyDamageMultiplier: 0.85 + levelNumber * 0.02,
       rewardMultiplier: 1.12,
-      heroDamageMultipliers: {
-        melee: 1.15,
-        ranged: 1.08,
-      },
+      heroDamageMultipliers: {},
     },
-    notes: ["Fragile but dangerous", "Melee burst favored", "Slow builds take more hits"],
+    notes: ["Fragile but deadly", "Higher reward per kill"],
     enemyWaves: buildWaves("glassCultist", levelNumber, 28, 0.52),
   };
 }
@@ -179,12 +175,9 @@ function createBruteLevel(levelNumber: number): LevelDefinition {
       enemyHealthMultiplier: levelScale(levelNumber) * 1.08,
       enemyDamageMultiplier: 1 + levelNumber * 0.025,
       rewardMultiplier: 1.18,
-      heroDamageMultipliers: {
-        magic: 1.18,
-        summon: 1.12,
-      },
+      heroDamageMultipliers: {},
     },
-    notes: ["Armored enemies", "Magic and summons favored", "Low single-target builds are slower"],
+    notes: ["Armored brutes", "Higher reward per kill"],
     enemyWaves: buildWaves("graveBrute", levelNumber, 12, 1.05),
   };
 }
@@ -194,15 +187,11 @@ function createCasterLevel(levelNumber: number): LevelDefinition {
     ...baseLevel(levelNumber, "normal", "Lantern Storm", "Flying casters"),
     combat: {
       enemyHealthMultiplier: Math.max(0.7, levelScale(levelNumber) * 0.78),
-      enemyDamageMultiplier: 1.45 + levelNumber * 0.035,
+      enemyDamageMultiplier: 1.35 + levelNumber * 0.03,
       rewardMultiplier: 1.2,
-      heroDamageMultipliers: {
-        ranged: 1.22,
-        magic: 1.05,
-        melee: 0.92,
-      },
+      heroDamageMultipliers: {},
     },
-    notes: ["Flying casters", "High incoming damage", "Ranged control favored"],
+    notes: ["Flying casters", "Higher reward per kill"],
     enemyWaves: buildWaves("spellWisp", levelNumber, 24, 0.62),
   };
 }
@@ -214,13 +203,9 @@ function createSwarmLevel(levelNumber: number): LevelDefinition {
       enemyHealthMultiplier: Math.max(0.65, levelScale(levelNumber) * 0.72),
       enemyDamageMultiplier: 0.82 + levelNumber * 0.018,
       rewardMultiplier: 0.92,
-      heroDamageMultipliers: {
-        magic: 1.2,
-        summon: 1.16,
-        melee: 1.08,
-      },
+      heroDamageMultipliers: {},
     },
-    notes: ["Many weak enemies", "Area damage favored", "Single-target builds waste attacks"],
+    notes: ["Large swarm", "Lower reward per kill"],
     enemyWaves: buildWaves("rotImp", levelNumber, 48, 0.28),
   };
 }
@@ -232,12 +217,9 @@ function createShieldLevel(levelNumber: number): LevelDefinition {
       enemyHealthMultiplier: levelScale(levelNumber),
       enemyDamageMultiplier: 0.95 + levelNumber * 0.02,
       rewardMultiplier: 1.16,
-      heroDamageMultipliers: {
-        magic: 1.24,
-        ranged: 0.9,
-      },
+      heroDamageMultipliers: {},
     },
-    notes: ["Heavy armor", "Magic favored", "Precision damage is blunted"],
+    notes: ["Armored formation", "Higher reward per kill"],
     enemyWaves: [
       ...buildWaves("shieldBearer", levelNumber, 18, 0.82),
       { enemyId: "glassCultist", count: Math.max(2, Math.floor(levelNumber / 2)), startsAt: 6, interval: 0.7, gate: "east" },

@@ -268,8 +268,60 @@ New `src/game/traits.test.ts` — unit tests over the pure resolvers:
   damage from casters than its armor value would predict.
 - `traitEffect` events are emitted at most once per enemy per trait.
 
-Balance sweep (a test, not a manual step): every campaign level from 1 to 30 is
-winnable by at least one class, and no level is winnable by only one class.
+Balance harness (`src/game/balance.ts`, a test, not a manual step): balance is
+measured as **required gear power** — the smallest uniform multiplier on health,
+damage, armor and ability power at which a build clears a level. A win/loss
+matrix at base stats was tried first and rejected: the campaign assumes gear, so
+at base stats levels 4, 7, 8, 11 and 12 are unwinnable by every class and the
+metric carries no information past level 3.
+
+The measured pre-change baseline lives in
+`docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`. It establishes
+that three of the current `heroDamageMultipliers` point the wrong way: armored
+levels favour chip damage over big hits (Shield Line: fast-weak 2.40× vs
+slow-heavy 4.25×), armor is the better answer to casters than health (Lantern
+Storm: 2.55× vs 2.80×), and Rot Tide is the Arcanist's worst level in the
+campaign at 4.00× despite handing magic a 1.2× bonus and advertising "Area
+damage favored". Those three inversions are the re-tune's targets, and the
+guardrails also cap per-level spread (worst class within 2× the median) and
+forbid difficulty inflation (median within 20% of baseline).
+
+## Outcome
+
+Measured against the final tables in
+`docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`, this slice's
+counterplay claim holds in part and does not hold in part.
+
+What holds: the *mechanism* moved. All 11 `heroDamageMultipliers` producers in
+`levels.ts` now pass `{}` — none of the class-keyed counterplay described in
+Problem remains — and that move buys a real build-shape axis on the offensive
+and ability dimensions. Level 4 (Grave March) separates fast-weak (3.00
+required power) from slow-heavy (1.70); that gap did not exist at a shared
+budget before trait teeth landed (Original: 1.65 vs 1.70, noise).
+
+Level 6 (Rot Tide) is not evidence of a new gap, even though it also shows
+spread (1.55) ahead of focused (2.65): that gap already existed, unchanged, in
+the Original table (1.55 vs 2.65). Pack scaling did not measurably widen it.
+The guardrail on this pair is a regression guard for a property that was
+already correct, not proof that this slice created it.
+
+What does not hold: class identity did not recede as build shape rose — it
+remains the dominant predictor of required power, and per-level class spread
+(the ratio of the worst class's required power to the best, across the five
+classes) actually *grew* on three of the four comparable levels: level 4
+1.68×→1.82×, level 5 1.90×→2.25×, level 7 2.23×→2.24×; only level 6 fell,
+4.00×→3.80×. The defensive axis (armor-stack vs. health-stack, an equal-budget
+fixture pair) discriminates on only one of the six levels it was measured on
+— level 5, the caster level — and ties on levels 4, 6, 7, 8 and 10, because
+those levels are bottlenecked by offense rather than defense (see the balance
+baseline's notes on "structurally uninformative" pairs).
+
+The accurate framing: this slice adds a build-shape axis on the offensive and
+ability dimensions on top of class identity, which remains the dominant
+predictor of required power across the campaign. It does not move
+counterplay off class identity onto build shape, and should not be described
+that way. The mechanism change and the offensive/ability gaps it created are
+real and verified; a broader, class-displacing shift is not.
 
 ## Verification
 

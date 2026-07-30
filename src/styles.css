@@ -247,6 +247,53 @@ button {
   font-weight: 800;
 }
 
+.enemy-roster {
+  display: grid;
+  gap: 9px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.roster-entry {
+  display: grid;
+  gap: 5px;
+}
+
+.roster-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #eef2f8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.roster-head span {
+  color: #9ca8ba;
+}
+
+.enemy-roster ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enemy-roster li {
+  color: #c9d2df;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.enemy-roster li span {
+  margin-right: 6px;
+  color: #eef2f8;
+  font-weight: 800;
+}
+
 .talent-panel {
   display: grid;
   gap: 9px;

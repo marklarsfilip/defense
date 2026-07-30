@@ -4,7 +4,7 @@
 
 **Goal:** Give the nine `EnemyTrait` values real mechanical teeth so they force build counterplay, and move that counterplay out of the level-wide `heroDamageMultipliers` that currently fake it.
 
-**Architecture:** A new pure module `src/game/traits.ts` holds a flat `traitRules` table of typed knobs plus two resolvers — `resolveHeroDamage` (hero → enemy) and `resolveEnemyDamage` (enemy → hero). `simulateCombat.ts` funnels its four damage sites through those two functions, deleting `getTargetDamageMultiplier` and its local `mitigateDamage`. Trait rule text is authored in the same table the rules live in, and a new `roster.ts` turns a level's waves into per-enemy trait descriptions for the pre-combat UI. Balance is corrected in `content.ts` and `levels.ts` against a win-matrix baseline recorded before any content changes.
+**Architecture:** A new pure module `src/game/traits.ts` holds a flat `traitRules` table of typed knobs plus two resolvers — `resolveHeroDamage` (hero → enemy) and `resolveEnemyDamage` (enemy → hero). `simulateCombat.ts` funnels its four damage sites through those two functions, deleting `getTargetDamageMultiplier` and its local `mitigateDamage`. Trait rule text is authored in the same table the rules live in, and a new `roster.ts` turns a level's waves into per-enemy trait descriptions for the pre-combat UI. Balance is corrected in `content.ts` and `levels.ts` against a **required-gear-power** baseline already measured on untouched code and written up in `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`.
 
 **Tech Stack:** TypeScript, Vite, React 19, Vitest 4. No new dependencies.
 
@@ -32,41 +32,11 @@ Creates the data layer: the table of knobs and the player-facing text, with no c
 - Create: `src/game/traits.test.ts`
 - Modify: `src/game/types.ts` (add `PackScaling`, `TraitRule`, `TraitDescription`)
 
-**Files (additional):**
-- Create: `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`
-
 **Interfaces:**
 - Consumes: `EnemyTrait` from `src/game/types.ts`.
-- Produces: `traitRules: Record<EnemyTrait, TraitRule>`, `describeTrait(trait: EnemyTrait): TraitDescription`, `describeEnemyTraits(traits: EnemyTrait[]): TraitDescription[]`, `enemyPlating(traits: EnemyTrait[]): number`, `hasTraitRule(trait: EnemyTrait): boolean`. Types `PackScaling`, `TraitRule`, `TraitDescription` exported from `types.ts`. Plus the recorded pre-change win matrix that Task 7 is judged against.
+- Produces: `traitRules: Record<EnemyTrait, TraitRule>`, `describeTrait(trait: EnemyTrait): TraitDescription`, `describeEnemyTraits(traits: EnemyTrait[]): TraitDescription[]`, `enemyPlating(traits: EnemyTrait[]): number`, `hasTraitRule(trait: EnemyTrait): boolean`. Types `PackScaling`, `TraitRule`, `TraitDescription` exported from `types.ts`.
 
-- [ ] **Step 0: Record the pre-change win matrix, before touching any code**
-
-This must happen first, on untouched code — once the resolvers are wired in Task 4, the original balance is no longer measurable.
-
-Create a temporary probe at `src/game/balanceProbe.test.ts`:
-
-```ts
-import { describe, it } from "vitest";
-import { heroClasses } from "./content";
-import { createCampaignLevel } from "./levels";
-import { simulateCombat } from "./simulateCombat";
-
-describe("balance probe", () => {
-  it("prints the win matrix", () => {
-    for (let levelNumber = 1; levelNumber <= 12; levelNumber += 1) {
-      const level = createCampaignLevel(levelNumber);
-      const winners = heroClasses.filter((heroClass) => simulateCombat(heroClass, level).won).map((h) => h.id);
-      console.log(`${levelNumber}\t${level.subtitle}\t${winners.length}\t${winners.join(",") || "none"}`);
-    }
-  });
-});
-```
-
-Run: `npm test -- balanceProbe`
-
-Copy the printed table verbatim into a new `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md` under `## Original (before trait teeth)`, noting the commit from `git rev-parse --short HEAD` above the table.
-
-Keep `src/game/balanceProbe.test.ts` — Task 6 and Task 7 re-run it to measure the same matrix at two later points. It is deleted in Task 7.
+**Read first:** `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`. The pre-change balance baseline has **already been measured** on untouched code at commit `70ff484` and written up there, because it stops being measurable once Task 4 wires the resolvers in. It also documents that three of the current `heroDamageMultipliers` point the wrong way, which is the evidence this whole slice rests on. Do not re-measure it.
 
 - [ ] **Step 1: Add the trait types to `src/game/types.ts`**
 
@@ -266,7 +236,7 @@ Expected: PASS, 6 tests.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/game/traits.ts src/game/traits.test.ts src/game/types.ts src/game/balanceProbe.test.ts docs/superpowers/plans/2026-07-30-trait-balance-baseline.md
+git add src/game/traits.ts src/game/traits.test.ts src/game/types.ts
 git commit -m "Add enemy trait rule table with player-facing descriptions"
 ```
 
@@ -864,58 +834,120 @@ git commit -m "Announce trait effects once per enemy in the combat log"
 
 ---
 
-### Task 6: Record the balance baseline and write the counterplay guardrails
+### Task 6: Balance harness and counterplay guardrails
 
-Writes the tests that define what "sharp but recoverable" means, and captures the pre-change win matrix so Task 7's re-tune can be judged against something real rather than against a guess. These tests are expected to fail at the end of this task — Task 7 makes them pass.
+Turns balance into tests. The pre-change baseline has already been measured and written to `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md` — read that document before starting this task; it contains the numbers every assertion here is calibrated against, and it proves three of the current `heroDamageMultipliers` point the wrong way.
+
+Several of these guardrails are expected to FAIL at the end of this task. That is the point: Task 7 makes them pass.
 
 **Files:**
+- Create: `src/game/balance.ts`
 - Create: `src/game/traitBalance.test.ts`
-- Create: `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`
+- Modify: `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md`
 
 **Interfaces:**
-- Consumes: `simulateCombat`, `createCampaignLevel`, `heroClasses`.
-- Produces: the guardrail suite that gates Task 7.
+- Consumes: `simulateCombat`, `createCampaignLevel`, `heroClasses`, `applyStatModifiers`.
+- Produces: `scaledHero(heroClass: HeroClass, factor: number): HeroClass`, `requiredPower(heroClass: HeroClass, levelNumber: number): number | null`, `requiredPowerByClass(levelNumber: number): Array<{ id: HeroClassId; required: number | null }>` from `src/game/balance.ts`; plus the guardrail suite that gates Task 7.
+
+**Why required power, not win/loss:** a win/loss matrix at base stats is useless past level 3, because the campaign assumes gear. At base stats, levels 4, 7, 8, 11 and 12 are unwinnable by every class. `requiredPower` instead reports the smallest uniform gear multiplier at which a build clears a level, which stays informative at every level and makes "harder for this build shape" a number rather than a coin flip.
 
 Archetype-to-level mapping, from `pickArchetype` (`sequence[(levelNumber - 2) % 7]`): level 2 flying, 3 glass, **4 brute (armored)**, **5 caster**, **6 swarm**, **7 shield (armored)**, 8 mixed, 10 boss.
 
-- [ ] **Step 1: Record the traits-on, content-untuned matrix**
+- [ ] **Step 1: Create the balance harness**
 
-Run the probe kept from Task 1 Step 0:
+`src/game/balance.ts`. This is production-adjacent test support, not a test file, because Task 7 iterates with it and later slices (2c, 2d) will reuse it.
 
-Run: `npm test -- balanceProbe`
+```ts
+import { heroClasses } from "./content";
+import { createCampaignLevel } from "./levels";
+import { simulateCombat } from "./simulateCombat";
+import { applyStatModifiers } from "./stats";
+import type { HeroClass, HeroClassId } from "./types";
 
-Append the table to `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md` under `## Traits wired, content not yet re-tuned`. This is the intermediate state — the difference from the Original table is exactly how much damage the raw trait rules did to existing balance, which tells Task 7 where to aim.
+export const MAX_POWER_FACTOR = 12;
+const POWER_STEP = 0.05;
+
+/**
+ * Scales the gear-driven stats by `factor`, approximating how geared a player
+ * is. A factor of 1 is a naked level-1 hero. Attack speed, crit and cooldown
+ * reduction are deliberately left alone so the factor measures raw power rather
+ * than reshaping the build.
+ */
+export function scaledHero(heroClass: HeroClass, factor: number): HeroClass {
+  const base = heroClass.stats;
+
+  return {
+    ...heroClass,
+    stats: applyStatModifiers(base, {
+      health: base.health * (factor - 1),
+      damage: base.damage * (factor - 1),
+      armor: base.armor * (factor - 1),
+      abilityPower: base.abilityPower * (factor - 1),
+    }),
+  };
+}
+
+/**
+ * Smallest gear factor at which this hero clears the level, or null if it never
+ * does within MAX_POWER_FACTOR. Lower is easier.
+ */
+export function requiredPower(heroClass: HeroClass, levelNumber: number): number | null {
+  const level = createCampaignLevel(levelNumber);
+
+  for (let factor = 1; factor <= MAX_POWER_FACTOR + POWER_STEP / 2; factor += POWER_STEP) {
+    if (simulateCombat(scaledHero(heroClass, factor), level).won) {
+      return Math.round(factor * 100) / 100;
+    }
+  }
+
+  return null;
+}
+
+export function requiredPowerByClass(levelNumber: number): Array<{ id: HeroClassId; required: number | null }> {
+  return heroClasses.map((heroClass) => ({ id: heroClass.id, required: requiredPower(heroClass, levelNumber) }));
+}
+
+/** Median of the defined values, treating null as MAX_POWER_FACTOR. */
+export function medianPower(values: Array<number | null>): number {
+  const resolved = values.map((value) => value ?? MAX_POWER_FACTOR).sort((a, b) => a - b);
+
+  return resolved[Math.floor(resolved.length / 2)];
+}
+```
+
+A linear scan rather than a binary search: `won` is not guaranteed monotonic in the gear factor (more damage can change kill order and therefore which enemies land hits), so a binary search could return a misleading threshold. The scan costs about 200ms for the whole class matrix, which is cheap enough.
 
 - [ ] **Step 2: Write the guardrail suite**
 
-Create `src/game/traitBalance.test.ts`:
+Create `src/game/traitBalance.test.ts`. Every number in `BASELINE_MEDIAN` and every inversion below is copied from the baseline document — do not re-derive them.
 
 ```ts
 import { describe, expect, it } from "vitest";
 import { heroClasses } from "./content";
-import { createCampaignLevel } from "./levels";
-import { simulateCombat } from "./simulateCombat";
+import { medianPower, requiredPower, requiredPowerByClass } from "./balance";
 import type { HeroClass, Stats } from "./types";
 
 const BRUTE_LEVEL = 4;
 const CASTER_LEVEL = 5;
 const SWARM_LEVEL = 6;
+const SHIELD_LEVEL = 7;
 
-/**
- * Two builds with the same nominal damage-per-second budget but opposite
- * shapes. Any difference in outcome between them is trait counterplay, not
- * raw power.
- */
-function shapedHero(id: string, stats: Partial<Stats>): HeroClass {
+/** Measured on untouched code at commit 70ff484. See the baseline document. */
+const BASELINE_MEDIAN: Record<number, number> = {
+  1: 1.0, 2: 1.0, 3: 1.0, 4: 1.55, 5: 1.05, 6: 2.6,
+  7: 2.4, 8: 1.35, 9: 1.7, 10: 1.2, 11: 3.05, 12: 3.15,
+};
+
+function shapedHero(name: string, stats: Partial<Stats>, abilities: HeroClass["abilities"] = []): HeroClass {
   return {
     id: "berserker",
-    name: id,
+    name,
     fantasy: "",
     combatStyle: "",
     color: "#fff",
     damageKind: "melee",
     stats: {
-      health: 400,
+      health: 200,
       armor: 10,
       damage: 20,
       attackSpeed: 1,
@@ -926,85 +958,90 @@ function shapedHero(id: string, stats: Partial<Stats>): HeroClass {
       cooldownReduction: 0,
       ...stats,
     },
-    abilities: [],
+    abilities,
   } as HeroClass;
 }
 
-// damage x attackSpeed is 40 for both.
+// Equal damage x attackSpeed budget (40), opposite shapes.
 const FAST_WEAK = shapedHero("fast-weak", { damage: 10, attackSpeed: 4 });
 const SLOW_HEAVY = shapedHero("slow-heavy", { damage: 40, attackSpeed: 1 });
 
+// Equal defensive budget spent two ways.
+const ARMOR_STACK = shapedHero("armor-stack", { armor: 30, health: 150 });
+const HEALTH_STACK = shapedHero("health-stack", { armor: 6, health: 270 });
+
+// Equal ability budget, spread across many targets or concentrated on one.
+const SPREAD = shapedHero("spread", {}, [
+  { id: "nova", name: "Nova", description: "", cooldown: 4, effect: { kind: "damage", targets: 5, damageMultiplier: 1, apScaling: 0 } },
+]);
+const FOCUSED = shapedHero("focused", {}, [
+  { id: "stab", name: "Stab", description: "", cooldown: 4, effect: { kind: "damage", targets: 1, damageMultiplier: 5, apScaling: 0 } },
+]);
+
+/** Fails loudly rather than comparing against null. */
+function power(hero: HeroClass, levelNumber: number): number {
+  const required = requiredPower(hero, levelNumber);
+  expect(required, `${hero.name} never cleared level ${levelNumber}`).not.toBeNull();
+
+  return required!;
+}
+
 describe("armored counterplay", () => {
-  it("punishes many-small-hits builds and rewards big hits at equal dps budget", () => {
-    const level = createCampaignLevel(BRUTE_LEVEL);
-    const fast = simulateCombat(FAST_WEAK, level);
-    const heavy = simulateCombat(SLOW_HEAVY, level);
-
-    expect(heavy.enemiesDefeated).toBeGreaterThan(fast.enemiesDefeated);
+  it("makes big hits the answer on Shield Line, inverting the baseline", () => {
+    // Baseline: fast-weak 2.40, slow-heavy 4.25 — armored favoured chip damage.
+    expect(power(SLOW_HEAVY, SHIELD_LEVEL)).toBeLessThan(power(FAST_WEAK, SHIELD_LEVEL));
   });
 
-  it("is sharp but recoverable: reshaping the same budget turns a loss into a win", () => {
-    const level = createCampaignLevel(BRUTE_LEVEL);
-
-    expect(simulateCombat(FAST_WEAK, level).won).toBe(false);
-    expect(simulateCombat(SLOW_HEAVY, level).won).toBe(true);
-  });
-});
-
-describe("swarm counterplay", () => {
-  it("rewards a multi-target ability over an equivalent single-target one", () => {
-    const level = createCampaignLevel(SWARM_LEVEL);
-    const base = shapedHero("swarm-test", { damage: 20, attackSpeed: 1 });
-    const spread = {
-      ...base,
-      abilities: [{ id: "nova", name: "Nova", description: "", cooldown: 4, effect: { kind: "damage" as const, targets: 5, damageMultiplier: 1, apScaling: 0 } }],
-    };
-    const focused = {
-      ...base,
-      abilities: [{ id: "stab", name: "Stab", description: "", cooldown: 4, effect: { kind: "damage" as const, targets: 1, damageMultiplier: 5, apScaling: 0 } }],
-    };
-
-    expect(simulateCombat(spread, level).enemiesDefeated)
-      .toBeGreaterThan(simulateCombat(focused, level).enemiesDefeated);
+  it("makes big hits the answer on Grave March, where the baseline was noise", () => {
+    // Baseline: fast-weak 1.65, slow-heavy 1.70 — no discrimination at all.
+    // Require a clear gap, not a coin flip.
+    expect(power(SLOW_HEAVY, BRUTE_LEVEL)).toBeLessThan(power(FAST_WEAK, BRUTE_LEVEL) * 0.9);
   });
 });
 
 describe("caster counterplay", () => {
-  it("makes armor stacking a poor answer compared to health", () => {
-    const level = createCampaignLevel(CASTER_LEVEL);
-    // Same defensive budget spent two ways: 20 armor, or the health equivalent.
-    const armored = shapedHero("armored", { armor: 30, health: 300 });
-    const healthy = shapedHero("healthy", { armor: 6, health: 540 });
+  it("makes health a better answer than armor, inverting the baseline", () => {
+    // Baseline: armor-stack 2.55, health-stack 2.80 — armor was strictly better.
+    expect(power(HEALTH_STACK, CASTER_LEVEL)).toBeLessThan(power(ARMOR_STACK, CASTER_LEVEL));
+  });
+});
 
-    expect(simulateCombat(healthy, level).heroHealthRemaining)
-      .toBeGreaterThan(simulateCombat(armored, level).heroHealthRemaining);
+describe("swarm counterplay", () => {
+  it("keeps multi-target ahead of single-target on Rot Tide", () => {
+    // Baseline: spread 1.55, focused 2.65 — already correct. Regression guard.
+    expect(power(SPREAD, SWARM_LEVEL)).toBeLessThan(power(FOCUSED, SWARM_LEVEL));
   });
 });
 
 describe("campaign balance", () => {
-  it("keeps level 1 unloseable for every starter class", () => {
-    for (const heroClass of heroClasses) {
-      const result = simulateCombat(heroClass, createCampaignLevel(1));
-      expect(result.won, heroClass.id).toBe(true);
-      expect(result.enemiesDefeated, heroClass.id).toBe(30);
+  it("keeps level 1 clearable by every class with no gear at all", () => {
+    for (const entry of requiredPowerByClass(1)) {
+      expect(entry.required, entry.id).toBe(1);
     }
   });
 
-  it("never leaves a level winnable by exactly one class in the early campaign", () => {
+  it("keeps the worst class within twice the median on every early level", () => {
     for (let levelNumber = 1; levelNumber <= 12; levelNumber += 1) {
-      const level = createCampaignLevel(levelNumber);
-      const winners = heroClasses.filter((heroClass) => simulateCombat(heroClass, level).won);
+      const required = requiredPowerByClass(levelNumber).map((entry) => entry.required);
+      const median = medianPower(required);
+      const worst = Math.max(...required.map((value) => value ?? 12));
 
-      expect(winners.length, `level ${levelNumber} (${level.subtitle})`).not.toBe(1);
+      expect(worst / median, `level ${levelNumber} spread`).toBeLessThanOrEqual(2);
     }
   });
 
-  it("lets every class reach some enemies on every early level", () => {
+  it("does not inflate difficulty: median power stays within 20% of the baseline", () => {
     for (let levelNumber = 1; levelNumber <= 12; levelNumber += 1) {
-      const level = createCampaignLevel(levelNumber);
+      const median = medianPower(requiredPowerByClass(levelNumber).map((entry) => entry.required));
+
+      expect(median, `level ${levelNumber} median`).toBeLessThanOrEqual(BASELINE_MEDIAN[levelNumber] * 1.2);
+    }
+  });
+
+  it("leaves every class able to kill something on every early level", () => {
+    for (let levelNumber = 1; levelNumber <= 12; levelNumber += 1) {
       for (const heroClass of heroClasses) {
-        const result = simulateCombat(heroClass, level);
-        expect(result.enemiesDefeated, `${heroClass.id} on level ${levelNumber}`).toBeGreaterThan(0);
+        expect(requiredPower(heroClass, levelNumber), `${heroClass.id} on level ${levelNumber}`).not.toBeNull();
       }
     }
   });
@@ -1014,17 +1051,23 @@ describe("campaign balance", () => {
 - [ ] **Step 3: Run the suite and record which guardrails fail**
 
 Run: `npm test -- traitBalance`
-Expected: some FAIL. That is the point of this task.
 
-Append the failure list to `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md` under `## Guardrail failures before re-tune`.
-
-If the `never leaves a level winnable by exactly one class` guardrail already failed in the **Original** table from Task 1 Step 0 for some level, that failure predates this work: note it as pre-existing and exclude that level by number with an inline comment naming it. Do not silently loosen the assertion, and do not spend Task 7 fixing balance this slice did not break.
-
-- [ ] **Step 4: Commit**
+Expect the three inversion tests to fail (armored ×2, caster ×1) and the campaign-balance tests to be in flux. Record the exact failure list in the baseline document under `## Traits wired, content not yet re-tuned`, together with the full class matrix produced by:
 
 ```bash
-git add src/game/traitBalance.test.ts docs/superpowers/plans/2026-07-30-trait-balance-baseline.md
-git commit -m "Add trait counterplay guardrails and record the untuned matrix"
+npx vitest run traitBalance --reporter=verbose
+```
+
+If the `leaves every class able to kill something` guardrail fails for a class/level pair, that means the pair is unwinnable even at 12× gear — note it, because Task 7 must fix it.
+
+- [ ] **Step 4: Typecheck and commit**
+
+Run: `npm run build`
+Expected: passes. `balance.ts` is imported only by tests, which is fine — it is not dead code to the typechecker.
+
+```bash
+git add src/game/balance.ts src/game/traitBalance.test.ts docs/superpowers/plans/2026-07-30-trait-balance-baseline.md
+git commit -m "Add a required-power balance harness and trait counterplay guardrails"
 ```
 
 ---
@@ -1105,15 +1148,19 @@ Iterate on `content.ts` enemy stats and `levels.ts` multipliers until the whole 
 - **Never** change a trait knob in `traits.ts` — those values define the design.
 - **Never** weaken a guardrail assertion to make it pass. If a guardrail looks genuinely wrong rather than unmet, stop and say so instead of editing it.
 - The level-1 guardrail and the determinism test are absolute.
-- If the equal-budget fixtures in `traitBalance.test.ts` (`FAST_WEAK` / `SLOW_HEAVY`, and the caster pair) turn out to sit on the wrong side of a win/loss threshold for reasons unrelated to traits — for instance both lose because 400 health is not survivable at level 4 — adjust the **fixture** numbers so the comparison is meaningful, keeping the two builds' budgets equal to each other. Adjusting a fixture to make a property testable is legitimate; adjusting an assertion to make a failure disappear is not.
+- The `BASELINE_MEDIAN` table in `traitBalance.test.ts` is measured history. Never edit it.
+- If an equal-budget fixture pair turns out to be structurally uninformative on a level — as `armor-stack` / `health-stack` already is on levels 4, 7 and 10, where both return identical values because the win threshold is set by damage output — pick a level where it does discriminate rather than forcing the assertion. The baseline document records which pairs are informative where.
+- If a fixture can't clear a level at any gear factor (both defensive fixtures read `>12` on Rot Tide, since a 20-damage hero with no abilities cannot kill 48+ enemies), adjust the **fixture** so the comparison is measurable, keeping the two builds' budgets equal to each other. Adjusting a fixture to make a property testable is legitimate; adjusting an assertion to make a failure disappear is not.
 
-- [ ] **Step 6: Record the after matrix and remove the probe**
+- [ ] **Step 6: Record the after matrix**
 
-Run: `npm test -- balanceProbe`
+Re-measure the full class matrix and the build-shape pairs, using the same fixtures the baseline document describes:
 
-Append the table to `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md` under `## After trait teeth and re-tune`, followed by a short paragraph comparing it to the **Original** table: what moved, and why. Any level that lost winners relative to Original needs a sentence justifying it — the target is a redistribution of difficulty across build shapes, not a net difficulty increase.
+```bash
+npx vitest run traitBalance --reporter=verbose
+```
 
-Then delete `src/game/balanceProbe.test.ts`. Its output now lives in the doc, and a test that only prints has no place in the permanent suite.
+Append both tables to `docs/superpowers/plans/2026-07-30-trait-balance-baseline.md` under `## After trait teeth and re-tune`, followed by a paragraph comparing them to the **Original** tables: which inversions landed, what moved, and why. Every level whose median required power rose needs a sentence justifying it — the target is redistributing difficulty across build shapes, not inflating it.
 
 - [ ] **Step 7: Typecheck and commit**
 
@@ -1121,7 +1168,7 @@ Run: `npm run build && npm test`
 Expected: both pass, full suite green.
 
 ```bash
-git add -A src/game/content.ts src/game/levels.ts src/game/balanceProbe.test.ts docs/superpowers/plans/2026-07-30-trait-balance-baseline.md
+git add src/game/content.ts src/game/levels.ts docs/superpowers/plans/2026-07-30-trait-balance-baseline.md
 git commit -m "Re-tune enemies and levels around real trait rules"
 ```
 

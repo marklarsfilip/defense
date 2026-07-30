@@ -28,7 +28,7 @@ describe("simulateCombat", () => {
     expect(result.gold).toBe(90);
   });
 
-  it("lets melee heroes hit flying enemies with weaker fallback attacks", () => {
+  it("lets melee heroes hit flying enemies with weaker fallback attacks, less efficiently than ranged", () => {
     const flyingLevel = createCampaignLevel(2);
     const berserker = heroClasses.find((heroClass) => heroClass.id === "berserker")!;
     const ranger = heroClasses.find((heroClass) => heroClass.id === "ranger")!;
@@ -36,7 +36,28 @@ describe("simulateCombat", () => {
     const rangerResult = simulateCombat(ranger, flyingLevel);
 
     expect(meleeResult.enemiesDefeated).toBeGreaterThan(0);
-    expect(rangerResult.enemiesDefeated).toBeGreaterThan(meleeResult.enemiesDefeated);
+    // enemiesDefeated saturates once both classes clear the level (both end up at the
+    // wave's total enemy count), so it can no longer express a degree of advantage now
+    // that trait effects like fragile's crit vulnerability help melee close the gap.
+    // duration and health remaining don't saturate and together capture what "ranged
+    // handles flyers better" actually means: faster and safer. Do not swap this back to
+    // enemiesDefeated without re-checking whether both sides still hit the same ceiling.
+    expect(rangerResult.duration).toBeLessThan(meleeResult.duration);
+    expect(rangerResult.heroHealthRemaining).toBeGreaterThan(meleeResult.heroHealthRemaining);
+  });
+
+  it("announces each trait once per enemy so the log explains the fight", () => {
+    const bruteLevel = createCampaignLevel(4);
+    const berserker = heroClasses.find((heroClass) => heroClass.id === "berserker")!;
+    const result = simulateCombat(berserker, bruteLevel);
+    const traitEvents = result.events.filter((event) => event.type === "traitEffect");
+
+    expect(traitEvents.length).toBeGreaterThan(0);
+    expect(traitEvents.some((event) => event.trait === "armored")).toBe(true);
+
+    const keys = traitEvents.map((event) => `${event.enemyId}:${event.trait}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(traitEvents.every((event) => event.message.length > 0)).toBe(true);
   });
 });
 
@@ -104,5 +125,27 @@ describe("ability effects", () => {
     ]);
     const ticks = simulateCombat(hero, level).events.filter((e) => e.type === "summonTick");
     expect(ticks.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("applies a level's heroDamageMultipliers to a hero of the matching damageKind only", () => {
+    const levelWithMultiplier = (multiplier: number): LevelDefinition => ({
+      ...loneLevel(null),
+      enemyWaves: [{ enemyId: "skeleton", count: 1, startsAt: 0, interval: 1, gate: "north" }],
+      combat: { enemyHealthMultiplier: 100000, enemyDamageMultiplier: 0, rewardMultiplier: 1, heroDamageMultipliers: { melee: multiplier } },
+    });
+    const meleeHero = bareHero({ damageKind: "melee", stats: STATS({ damage: 10 }) }, []);
+    const magicHero = bareHero({ damageKind: "magic", stats: STATS({ damage: 10 }) }, []);
+    const firstAttackDamage = (result: ReturnType<typeof simulateCombat>): number => {
+      const attack = result.events.find((e) => e.type === "attack") as Extract<(typeof result.events)[number], { type: "attack" }>;
+      return attack.damage;
+    };
+
+    const meleeBoosted = firstAttackDamage(simulateCombat(meleeHero, levelWithMultiplier(2)));
+    const meleeBaseline = firstAttackDamage(simulateCombat(meleeHero, levelWithMultiplier(1)));
+    const magicBoosted = firstAttackDamage(simulateCombat(magicHero, levelWithMultiplier(2)));
+    const magicBaseline = firstAttackDamage(simulateCombat(magicHero, levelWithMultiplier(1)));
+
+    expect(meleeBoosted).toBeGreaterThan(meleeBaseline);
+    expect(magicBoosted).toBe(magicBaseline);
   });
 });

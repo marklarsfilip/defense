@@ -13,6 +13,40 @@ export type EnemyTrait =
   | "boss"
   | "bonus";
 
+export interface PackScaling {
+  damagePerAlly: number;
+  resistancePerAlly: number;
+  maxAllies: number;
+}
+
+export interface TraitRule {
+  label: string;
+  /** Player-facing rule text for the pre-combat roster. */
+  summary: string;
+  /** Combat-log fragment, appended after the enemy name. Omit for traits with no rules. */
+  logLine?: string;
+  /** Multiplier applied to melee hero damage. */
+  meleePenalty?: number;
+  /** Multiplier applied when the incoming hit was a critical. */
+  critVulnerability?: number;
+  /** Flat damage subtracted after armor mitigation. Scaled per spawn by level. */
+  plating?: number;
+  /** Multiplier applied when the same attack struck more than one enemy. */
+  spreadResistance?: number;
+  /** Fraction of the hero's armor this enemy's attacks ignore. */
+  armorPierce?: number;
+  /** Multiplier applied to this enemy's outgoing damage. */
+  damageAmplifier?: number;
+  /** Scales both directions with the number of living packmates. */
+  pack?: PackScaling;
+}
+
+export interface TraitDescription {
+  trait: EnemyTrait;
+  label: string;
+  summary: string;
+}
+
 export type LevelKind = "normal" | "boss" | "bonus";
 
 export type LootRarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | "set";
@@ -207,6 +241,8 @@ export interface CombatEnemy {
   maxHealth: number;
   health: number;
   armor: number;
+  /** Flat post-armor damage reduction from armored-style traits, scaled by level. */
+  plating: number;
   damage: number;
   attackSpeed: number;
   moveSpeed: number;
@@ -289,6 +325,14 @@ export type CombatEvent =
       abilityId: string;
       targetId: string;
       damage: number;
+    }
+  | {
+      type: "traitEffect";
+      time: number;
+      enemyId: string;
+      enemyName: string;
+      trait: EnemyTrait;
+      message: string;
     };
 
 export interface CombatResult {

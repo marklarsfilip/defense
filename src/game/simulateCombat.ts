@@ -6,7 +6,8 @@ import {
   effectiveCooldown,
   summonDamagePerTick,
 } from "./abilities";
-import type { AbilityDefinition, CombatEnemy, CombatEvent, CombatResult, HeroClass, LevelDefinition } from "./types";
+import { resolveEnemyDamage, resolveHeroDamage, resolvePlating, traitRules } from "./traits";
+import type { AbilityDefinition, CombatEnemy, CombatEvent, CombatResult, EnemyTrait, HeroClass, LevelDefinition } from "./types";
 
 const HERO_ATTACK_WINDUP = 0.16;
 const ENEMY_REACH_TIME = 4.2;
@@ -32,6 +33,7 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
   const enemiesToSpawn = buildEnemySpawns(level);
   const activeEnemies: CombatEnemy[] = [];
   const defeated = new Set<string>();
+  const announcedTraits = new Set<string>();
   const nextEnemyAttack = new Map<string, number>();
   const nextAbilityReady = new Map<string, number>();
   for (const ability of heroClass.abilities) {
@@ -59,6 +61,18 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
     return activeEnemies.filter((enemy) => enemy.health > 0);
   }
 
+  // Pass the raw living swarm count (including the enemy being hit) — the resolvers
+  // subtract 1 internally to get the ally count. Do not pre-subtract here.
+  function livingSwarmCount(): number {
+    let count = 0;
+    for (const enemy of activeEnemies) {
+      if (enemy.health > 0 && enemy.traits.includes("swarm")) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   function pickTargets(count: number): CombatEnemy[] {
     return livingEnemies()
       .sort((a, b) => a.spawnTime - b.spawnTime)
@@ -71,6 +85,28 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
       xp += target.rewardXp;
       gold += target.rewardGold;
       events.push({ type: "death", time: roundTime(at + 0.08), enemyId: target.id });
+    }
+  }
+
+  function noteTraitEffects(enemy: CombatEnemy, applied: EnemyTrait[], at: number): void {
+    for (const trait of applied) {
+      const key = `${enemy.id}:${trait}`;
+      if (announcedTraits.has(key)) {
+        continue;
+      }
+      const message = traitRules[trait].logLine;
+      if (!message) {
+        continue;
+      }
+      announcedTraits.add(key);
+      events.push({
+        type: "traitEffect",
+        time: roundTime(at),
+        enemyId: enemy.id,
+        enemyName: enemy.name,
+        trait,
+        message,
+      });
     }
   }
 
@@ -92,11 +128,27 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
     if (effect.kind === "damage") {
       const targets = pickTargets(effect.targets);
       const perTarget = abilityDamagePerTarget(effect, heroClass.stats.damage, heroClass.stats.abilityPower, levelDamageMultiplier);
+      const swarmCount = livingSwarmCount();
       const targetIds: string[] = [];
+      // Collect trait notes and emit them once the attack event this ability cast
+      // produced is on the log, so cause (the hit) reads before effect (the trait
+      // line explaining it) — same ordering as the basic-attack site.
+      const traitNotes: { target: CombatEnemy; applied: EnemyTrait[] }[] = [];
       let lastDamage = 0;
       for (const target of targets) {
-        const damage = mitigateDamage(Math.round(perTarget * getTargetDamageMultiplier(heroClass, target)), target.armor);
+        const resolved = resolveHeroDamage({
+          rawDamage: perTarget,
+          traits: target.traits,
+          armor: target.armor,
+          plating: target.plating,
+          damageKind: heroClass.damageKind,
+          critical: false,
+          targetsHit: targets.length,
+          livingSwarmCount: swarmCount,
+        });
+        const damage = resolved.damage;
         target.health = Math.max(0, target.health - damage);
+        traitNotes.push({ target, applied: resolved.appliedTraits });
         lastDamage = damage;
         targetIds.push(target.id);
         events.push({
@@ -119,6 +171,9 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         damageKind: heroClass.damageKind,
         label: ability.name,
       });
+      for (const { target, applied } of traitNotes) {
+        noteTraitEffects(target, applied, time);
+      }
       return;
     }
 
@@ -180,7 +235,13 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
       const attackCadence = 1 / enemy.attackSpeed;
       if (time >= nextAttack) {
         nextEnemyAttack.set(enemy.id, nextAttack + attackCadence);
-        let damage = mitigateDamage(enemy.damage, heroClass.stats.armor);
+        const resolved = resolveEnemyDamage({
+          rawDamage: enemy.damage,
+          traits: enemy.traits,
+          heroArmor: heroClass.stats.armor,
+          livingSwarmCount: livingSwarmCount(),
+        });
+        let damage = resolved.damage;
         const currentShield = getShield();
         if (currentShield && time <= currentShield.expiresAt && currentShield.amount > 0) {
           const absorbed = Math.min(currentShield.amount, damage);
@@ -189,6 +250,10 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         }
         heroHealth = Math.max(0, heroHealth - damage);
         events.push({ type: "heroHit", time: roundTime(time), sourceId: enemy.id, damage });
+        // Note trait effects before the heroHealth <= 0 early return below, so a
+        // trait that lands the killing blow (e.g. a "dangerous" double-damage hit)
+        // still reaches the combat log instead of being cut off by the return.
+        noteTraitEffects(enemy, resolved.appliedTraits, time);
         if (heroHealth <= 0) {
           events.push({ type: "heroDefeated", time: roundTime(time) });
           return finishResult(heroClass, level, false, time, heroHealth, defeated.size, xp, gold, events);
@@ -203,9 +268,20 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
           summon.nextTick += summon.interval;
           continue;
         }
-        const damage = mitigateDamage(Math.round(summon.perTick * getTargetDamageMultiplier(heroClass, target)), target.armor);
+        const resolved = resolveHeroDamage({
+          rawDamage: summon.perTick,
+          traits: target.traits,
+          armor: target.armor,
+          plating: target.plating,
+          damageKind: heroClass.damageKind,
+          critical: false,
+          targetsHit: 1,
+          livingSwarmCount: livingSwarmCount(),
+        });
+        const damage = resolved.damage;
         target.health = Math.max(0, target.health - damage);
         events.push({ type: "summonTick", time: roundTime(time), abilityId: summon.abilityId, targetId: target.id, damage });
+        noteTraitEffects(target, resolved.appliedTraits, time);
         registerKill(target, time);
         summon.nextTick += summon.interval;
       }
@@ -241,7 +317,17 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
         const baseDamage = heroClass.stats.damage + buffs.damage + heroClass.stats.abilityPower * 0.55;
         const multiplier = critical ? heroClass.stats.critDamage : 1;
         const rawDamage = Math.round(baseDamage * multiplier * levelDamageMultiplier);
-        const damage = mitigateDamage(Math.round(rawDamage * getTargetDamageMultiplier(heroClass, target)), target.armor);
+        const resolved = resolveHeroDamage({
+          rawDamage,
+          traits: target.traits,
+          armor: target.armor,
+          plating: target.plating,
+          damageKind: heroClass.damageKind,
+          critical,
+          targetsHit: 1,
+          livingSwarmCount: livingSwarmCount(),
+        });
+        const damage = resolved.damage;
         target.health = Math.max(0, target.health - damage);
         events.push({
           type: "projectile",
@@ -260,6 +346,7 @@ export function simulateCombat(heroClass: HeroClass, level: LevelDefinition): Co
           damageKind: heroClass.damageKind,
           label: basicAttackLabel(heroClass.damageKind),
         });
+        noteTraitEffects(target, resolved.appliedTraits, time);
         registerKill(target, time);
       }
       const effectiveAttackSpeed = heroClass.stats.attackSpeed + buffs.attackSpeed;
@@ -299,6 +386,7 @@ function buildEnemySpawns(level: LevelDefinition): CombatEnemy[] {
         maxHealth,
         health: maxHealth,
         armor: definition.armor,
+        plating: resolvePlating(definition.traits, level.combat.enemyHealthMultiplier),
         damage: Math.max(1, Math.round(definition.damage * level.combat.enemyDamageMultiplier)),
         attackSpeed: definition.attackSpeed,
         moveSpeed: definition.moveSpeed,
@@ -312,19 +400,6 @@ function buildEnemySpawns(level: LevelDefinition): CombatEnemy[] {
   }
 
   return spawns.sort((a, b) => a.spawnTime - b.spawnTime);
-}
-
-function mitigateDamage(rawDamage: number, armor: number): number {
-  const armorMultiplier = 100 / (100 + armor * 6);
-  return Math.max(1, Math.round(rawDamage * armorMultiplier));
-}
-
-function getTargetDamageMultiplier(heroClass: HeroClass, enemy: CombatEnemy): number {
-  if (heroClass.damageKind === "melee" && enemy.traits.includes("flying")) {
-    return 0.38;
-  }
-
-  return 1;
 }
 
 function basicAttackLabel(kind: HeroClass["damageKind"]): string {
