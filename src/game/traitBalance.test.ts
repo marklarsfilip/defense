@@ -144,6 +144,14 @@ describe("campaign balance", () => {
     }
   });
 
+  // Known fragility (Task 7 fix round): on level 5 (Lantern Storm) this ratio
+  // sits at 1.96 against the 2.0 cap — passing, but not with much room. The
+  // median (1.15) is held solely by the Ranger; Arcanist and Summoner both
+  // sit on the 1.00 gear floor, so any future buff to either of them would
+  // drop the median to 1.00 and push Guardian's 2.25 over the cap without
+  // Guardian itself changing at all. The ratio is unstable whenever several
+  // classes bunch on the gear floor — watch this level first if the buff
+  // ever lands.
   it("keeps the worst class within twice the median on every early level", () => {
     for (let levelNumber = 1; levelNumber <= 12; levelNumber += 1) {
       const required = requiredPowerByClass(levelNumber).map((entry) => entry.required);

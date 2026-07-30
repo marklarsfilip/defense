@@ -254,10 +254,12 @@ Notes on this table:
 ## After trait teeth and re-tune
 
 Task 7 measurements, taken after re-tuning `content.ts` and `levels.ts` on
-`feat/enemy-trait-behaviors`. Produced by `npx vitest run traitBalance
---reporter=verbose` and by `src/game/balance.ts`.
+`feat/enemy-trait-behaviors`, **including a fix round** after independent
+review swept the parameter space and found seven issues in the first pass.
+This section reflects the corrected, final state. Produced by `npx vitest
+run traitBalance --reporter=verbose` and by `src/game/balance.ts`.
 
-### Changes made
+### Changes made (final)
 
 **Enemy stats (`src/game/content.ts`):**
 
@@ -265,46 +267,53 @@ Task 7 measurements, taken after re-tuning `content.ts` and `levels.ts` on
   wired in Tasks 1–5) now carries the armored identity; the raw armor stat is
   cut so mitigation isn't double-counted.
 - `shieldBearer.armor`: `18` → `12`. Same reasoning.
-- `gateTitan.armor`: `18` → `14`. Same reasoning.
+- `gateTitan.armor`: unchanged at `18`. A first pass cut this to `14` on the
+  same "plating carries the armored identity" reasoning applied to
+  `graveBrute`/`shieldBearer` — but `boss` grants no plating, so that
+  reasoning doesn't transfer, and the cut had no independent justification.
+  Restored to the original value.
 - `glassCultist.damage`: `7` → `4`. Pays for `dangerous` doubling every hit.
 - `rotImp.damage`: `3` → `2`. Pays for `swarm` pack scaling (+60% at max
   stacks).
-- `spellWisp.damage`: `9` → `8`. The brief suggested `9` → `5`, matched to a
-  much softer `enemyDamageMultiplier` curve on Lantern Storm. That
-  combination was tried first and made the level *offense-bottlenecked*
-  instead of *defense-bottlenecked*: a no-ability hero one-shots each
-  18-health Spell Wisp well before the gear factor needed to survive the
-  swarm, so `ARMOR_STACK` and `HEALTH_STACK` require identical gear
-  regardless of their armor/health split — the same structural failure mode
-  the baseline document already documents for level 8. Restoring most of the
-  raw damage (and raising the curve, below) keeps survival the binding
-  constraint so the armor-pierce mechanic has something to bite on. See
-  "Deviation from the brief" below.
+- `spellWisp.damage`: `9` → `9` (**unchanged**). A first pass cut this to `8`
+  (having tried the brief's `5` first and found it broke a guardrail — see
+  "Level 5 caster retune" below). Review found an equally effective fix that
+  needed no cut to this value at all: see below.
 
 **Level curves and multipliers (`src/game/levels.ts`):**
 
-- `heroDamageMultipliers` set to `{}` in `createBruteLevel`, `createShieldLevel`,
-  `createSwarmLevel`, `createCasterLevel`, `createGlassLevel` — removing the
-  faked class-vs-level counterplay now that traits provide the real thing.
-  `createFlyingLevel` keeps its multipliers unchanged, per the brief: `flying`
-  is the one trait that is genuinely class-keyed (melee can't reach a flyer),
-  and the melee-vs-flying test depends on it.
+- `heroDamageMultipliers` set to `{}` in `createBruteLevel`,
+  `createShieldLevel`, `createSwarmLevel`, `createCasterLevel`,
+  `createGlassLevel`, **and `createFlyingLevel`**. The brief said to leave
+  `createFlyingLevel`'s multipliers in place, reasoning that `flying` is
+  the one genuinely class-keyed trait. Review challenged that: the `flying`
+  trait's own `meleePenalty: 0.38` already delivers ranged-beats-melee
+  mechanically, so the level's `ranged: 1.2 / magic: 1.12 / summon: 1.08`
+  multipliers were a double-count of the exact kind this slice exists to
+  remove. Stripped them; the full suite (146 tests, including the
+  melee-vs-flying test in `simulateCombat.test.ts`) stayed green, so the
+  removal stands.
 - `createGlassLevel.enemyDamageMultiplier`: `1.25 + levelNumber * 0.035` →
-  `0.85 + levelNumber * 0.02`, as the brief specified — pays for `dangerous`'s
-  ×2 damage amplifier.
+  `0.85 + levelNumber * 0.02` — pays for `dangerous`'s ×2 damage amplifier.
 - `createCasterLevel.enemyDamageMultiplier`: `1.45 + levelNumber * 0.035` →
-  `1.6 + levelNumber * 0.034`. The brief's suggested cut (`0.95 + 0.02n`) is
-  what was tried first; see the `spellWisp.damage` note above and "Deviation
-  from the brief" below for why the curve ended up *higher* than the
-  original instead of lower.
-- Boss levels (`createBossLevel`) gained an escort — `rotImp` and `skeleton`
-  waves alongside the `gateTitan` — per the brief, so `spreadResistance` has
-  more than one target to matter against. `enemyHealthMultiplier` dropped
-  `1 + levelNumber * 0.14` → `1 + levelNumber * 0.11` to partially pay for
-  the added enemies.
-- `notes` rewritten on every archetype level (brute, shield, swarm, caster,
-  glass, flying, boss) to flavour-only text, per the brief's exact strings.
-  The roster panel is now the single source of counterplay claims.
+  **`1.35 + levelNumber * 0.03`** — below the original at every level
+  number, as the design intent requires (armor pierce already compounds with
+  caster damage, so caster damage should come down). See "Level 5 caster
+  retune" below for why this number, not the brief's steeper `0.95+0.02n`
+  cut, is the one that works.
+- `createBossLevel` gained an escort, then had it cut down: currently just
+  `rotImp: 3` alongside `gateTitan` (no `skeleton` wave).
+  `enemyHealthMultiplier`: `1 + levelNumber * 0.14` → `1 + levelNumber *
+  0.13`. See "Boss escort size" below — a much larger escort (6–9 `rotImp` +
+  4–6 `skeleton`, tried first) made spread strictly better than focused fire
+  on boss levels, which directly contradicts the `boss` trait's own
+  description (`"sustained single-target damage wins"`).
+- `notes` rewritten to flavour-only text on every archetype level (brute,
+  shield, swarm, caster, glass, flying, boss). Four of the brief's exact
+  strings (`"Heavy reward chest"` / `"High reward chest"` on brute, shield,
+  caster, glass) were themselves false — see "Reward-chest notes" below —
+  and were corrected to `"Higher reward per kill"`, which is what those
+  levels actually have.
 
 **Tests updated outside the guardrail suite:** `src/game/levels.test.ts` had
 two assertions hardcoded to text/shape this task intentionally changed —
@@ -312,36 +321,121 @@ two assertions hardcoded to text/shape this task intentionally changed —
 `"Fragile but deadly"`) and `toHaveLength(1)` on boss-level waves (replaced
 with `.length > 1` now that bosses have an escort). Neither is a balance
 guardrail; both were pinned to content this task was directed to rewrite.
+`src/game/traitBalance.test.ts` gained a comment (no assertion change) at the
+worst/median guardrail — see "Level 5 fragility" below.
 
-### Deviation from the brief
+### Level 5 caster retune — corrected narrative
 
-The brief's starting numbers for the caster archetype (`spellWisp.damage`
-`9→5`, curve `1.45+0.035n → 0.95+0.02n`) were tried first, exactly as
-written. They fixed the Shield Line median (the one guardrail that was
-failing) but broke a guardrail that had been passing: the caster inversion
-test tied at 2.35 = 2.35 instead of `health-stack < armor-stack`. Tracing it
-with `simulateCombat` directly showed both fixtures dying at gear factor 2.30
-and both clearing comfortably at 2.35 — the offense/defense balance had
-shifted so far toward "hero one-shots everything" that armor and health
-stopped mattering before the harness's 0.05 gear-factor resolution could
-tell them apart. Restoring `spellWisp.damage` most of the way back to its
-original value and raising the curve (ending at `8` and `1.6+0.034n`, rather
-than cutting both) kept enough raw incoming damage that survival, not raw
-kill speed, decides the outcome — which is what let armor-pierce actually
-discriminate between the two fixtures again.
+A first pass tried the brief's caster numbers verbatim (`spellWisp.damage`
+`9→5`, curve `1.45+0.035n → 0.95+0.02n`). They fixed the Shield Line median
+(the guardrail that was failing) but broke a guardrail that had been
+passing: the caster inversion test tied at 2.35 = 2.35 instead of asserting
+`health-stack < armor-stack`. Tracing it with `simulateCombat` directly
+showed both fixtures dying at gear factor 2.30 and both clearing comfortably
+at 2.35 — the cut was steep enough that a no-ability hero one-shots every
+18-health Spell Wisp well before the gear factor needed to survive the
+swarm, so armor and health stopped mattering before the harness's 0.05
+gear-factor resolution could tell the fixtures apart (the same
+offense-bottleneck failure mode already documented for level 8).
 
-This was found by sweeping `spellWisp.damage` (6–9) against curve
-coefficients directly against `simulateCombat`, checking each combination
-against both the fixture-inversion gap and the "worst class within 2x
-median" guardrail (Guardian, the highest-armor class, is the one most exposed
-to the same lever that separates the fixtures). The chosen values
-(`damage: 8`, curve `1.6 + levelNumber * 0.034`) land with comfortable margin
-on both: Lantern Storm's worst/median ratio is 1.96 (cap 2.0) and its median
-(1.15) sits under its 1.26 ceiling; the fixture gap is 0.5 gear-factor steps,
-not a single borderline step.
+That diagnosis was correct. The conclusion drawn from it — that fixing the
+tie required pushing `spellWisp.damage` and the curve back up, past the
+*original* values (landing at `damage: 8`, curve `1.6+0.034n`, both above
+`content.ts`'s pre-task numbers) — was wrong, and review caught it. A wider
+sweep found `spellWisp.damage: 9` (the *original*, unchanged) paired with
+curve `1.35 + levelNumber * 0.03` (*below* the original at every level)
+produces results identical to the over-corrected pair: median 1.15, ratio
+1.96, armor-stack 2.85 vs health-stack 2.35. The real fix was landing
+*somewhere below the offense-bottleneck threshold*, not landing *above the
+original*; the first pass overshot in the other direction because it kept
+testing points above the original rather than searching the space between
+the brief's cut and the original itself. Design intent — caster damage comes
+down because armor pierce already compounds — holds with this pairing,
+where it did not with the committed-then-corrected `8`/`1.6+0.034n`.
 
-No other deviations from the brief. `graveBrute`/`shieldBearer`/`gateTitan`
-armor and `glassCultist`/`rotImp` damage were changed exactly as specified.
+### Boss escort size
+
+The first-pass escort (`rotImp: 6 + floor(n/5)`, `skeleton: 4 + floor(n/10)`)
+made AoE strictly better on boss levels: measured `requiredPower(spread, 10)
+= 1.45` vs `requiredPower(focused, 10) = 1.70`, and at level 20, `spread =
+2.10` vs `focused = 2.65` — spread winning both times. That directly
+contradicts the `boss` trait's own summary in `traits.ts`
+(`"sustained single-target damage wins"`), which a lone boss honoured
+correctly (`focused 1.00 < spread 1.25`) before any escort existed.
+
+Swept escort sizes directly against `simulateCombat`, holding `gateTitan`
+fixed:
+
+| escort | lvl 10: spread / focused | lvl 20: spread / focused |
+| --- | --- | --- |
+| `rotImp 6+n/5` + `skeleton 4+n/10` (first pass) | 1.45 / 1.70 (wrong) | 2.10 / 2.65 (wrong) |
+| `rotImp 3+n/10` + `skeleton 2+n/20` | 1.45 / 1.45 (tied) | 2.20 / 2.10 (wrong) |
+| `rotImp 4`, no skeleton | 1.35 / 1.40 (wrong, narrow) | 2.20 / 1.80 (right) |
+| **`rotImp 3`, no skeleton (chosen)** | **1.55 / 1.35 (right)** | **2.45 / 1.80 (right)** |
+
+`rotImp: 3`, no `skeleton` wave, holds `focused < spread` at levels 10, 20,
+30, and 40 with comfortable margin (checked up to level 40 for robustness).
+`enemyHealthMultiplier`'s coefficient was raised slightly, `0.11` → `0.13`,
+to partially pay for the smaller escort's lighter pressure. Level 10's
+median lands at 1.35 (baseline 1.20, ceiling 1.44) — inside the cap.
+
+### Level 5 fragility (known, documented, not fixed)
+
+Independent review found that level 5's (Lantern Storm) worst/median ratio
+sits at **1.96 against the 2.0 cap** — passing, but with a per-hit-value
+failure band from 9.6 to 12.4 (ratio 2.05–2.20) immediately adjacent to it.
+The mechanism: the median (1.15) is held solely by the Ranger. Arcanist and
+Summoner both sit on the 1.00 gear floor (level 5's easiest possible
+reading), so any future buff to either of them — independent of anything on
+this level — would drop the median to 1.00 and push Guardian's required
+power (2.25) over the 2.0 cap without Guardian changing at all. This is
+recorded here, and as a comment on the guardrail in
+`src/game/traitBalance.test.ts`, rather than fixed: the assertion itself is
+correct and must not be weakened, and there is no single number on this
+level whose change wouldn't just relocate the same fragility (e.g. lowering
+Guardian's requirement risks breaking the armor-pierce inversion this level
+exists to test; raising the floor classes' requirement risks the median
+ceiling on the level below it). Watch this level first if any of the three
+floor/near-floor classes (Arcanist, Summoner, Ranger) gets buffed later.
+
+### Reward-chest notes were wrong in the brief
+
+Four of the brief's exact note strings — `"Heavy reward chest"` on Grave
+March and Shield Line, `"High reward chest"` on Lantern Storm and Glass
+Knives — are false. All four archetypes call `createChest(levelNumber, 1)`,
+identical to the mixed level's chest and nowhere near boss (`1.9`) or bonus
+(`2.8`) luck. What they actually have is an elevated `rewardMultiplier`
+(1.16–1.2, vs. baseline 1), which scales per-kill XP/gold, not chest luck.
+Replaced all four with `"Higher reward per kill"`, which is what's true.
+`createBossLevel`'s `"Higher reward chest"` is accurate as written (its
+chest luck multiplier really is 1.9) and was left alone.
+
+### Glass retune verification (level 17)
+
+Levels 1–12 are the only range the guardrail harness measures, but the glass
+archetype's *next* occurrence after level 3 is level 17 — outside that
+range, so the `glassCultist` damage cut (`7→4`) and curve cut
+(`1.25+0.035n → 0.85+0.02n`) were unverified by anything. Measured directly:
+
+| | berserker | arcanist | ranger | summoner | guardian | median |
+| --- | --- | --- | --- | --- | --- | --- |
+| Before (original numbers) | 5.05 | 8.65 | 7.80 | 5.80 | 3.80 | 5.80 |
+| After (current numbers) | 2.95 | 5.10 | 4.50 | 2.95 | 2.00 | 2.95 |
+
+The median roughly halved (5.80 → 2.95). Checked against neighbouring levels
+at the same (post-retune) settings to see whether this is a problem or an
+improvement:
+
+| lvl | 13 | 14 | 15 | 16 | **17** | 18 | 19 | 20 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| median | 3.40 | 4.20 | 2.80 | 2.90 | **2.95** | 4.40 | 5.35 | 2.15 |
+
+Before the retune, level 17 (5.80) was a difficulty spike well above its
+neighbours (15: 2.80, 16: 2.90, 18: 4.40) — closer to level 19's 5.35 than to
+the levels either side of it. After the retune, level 17 (2.95) sits
+smoothly between 16 (2.90) and 18 (4.40), consistent with the surrounding
+curve. The retune is confirmed to have removed an anomalous spike rather
+than trivializing or overtuning the level — no correction needed.
 
 ### Guardrail results (`npm test -- traitBalance`)
 
@@ -358,6 +452,8 @@ armor and `glassCultist`/`rotImp` damage were changed exactly as specified.
 - PASS `campaign balance > does not inflate difficulty: median power stays within 20% of the baseline`.
 - PASS `campaign balance > leaves every class able to kill something on every early level`.
 
+Full repo suite: `npm test` — 146/146 passed. `npm run build` — clean.
+
 ### Full class matrix (required power per class per level)
 
 | lvl | subtitle | berserker | arcanist | ranger | summoner | guardian | median |
@@ -370,10 +466,18 @@ armor and `glassCultist`/`rotImp` damage were changed exactly as specified.
 | 6 | Rot Tide | 1.90 | 4.00 | 3.15 | 2.60 | 1.05 | 2.60 |
 | 7 | Shield Line | 1.90 | 2.45 | 2.50 | 2.95 | 4.25 | 2.50 |
 | 8 | Restless Dead | 1.15 | 1.40 | 1.30 | 1.55 | 1.85 | 1.40 |
-| 9 | Broken Wings | 1.70 | 1.00 | 1.20 | 2.40 | 2.40 | 1.70 |
-| 10 | The Gate Titan | 1.35 | 1.40 | 1.40 | 2.10 | 1.50 | 1.40 |
+| 9 | Broken Wings | 1.70 | 1.10 | 1.45 | 2.40 | 2.40 | 1.70 |
+| 10 | The Gate Titan | 1.05 | 1.35 | 1.10 | 1.60 | 1.50 | 1.35 |
 | 11 | Grave March | 2.70 | 3.20 | 3.05 | 3.95 | 4.75 | 3.20 |
-| 12 | Lantern Storm | 2.80 | 4.35 | 4.35 | 1.85 | 3.30 | 3.30 |
+| 12 | Lantern Storm | 2.55 | 4.25 | 4.00 | 1.75 | 3.30 | 3.30 |
+
+Levels 9 and 10 shifted slightly from the pre-fix-round table: level 9
+(Broken Wings) because stripping its `heroDamageMultipliers` (item 4) removed
+the ranged/magic/summon discount, raising Arcanist (1.00→1.10) and Ranger
+(1.20→1.45) modestly; level 10 (boss) because of the smaller escort and
+adjusted health coefficient (item 2). Neither change affects that level's
+guardrail-relevant median vs. baseline (level 9: 1.70, unchanged; level 10:
+1.35, up from a pre-fix-round 1.40, still inside the 1.44 cap).
 
 ### Required power per build shape
 
@@ -383,34 +487,35 @@ armor and `glassCultist`/`rotImp` damage were changed exactly as specified.
 | fast-weak vs slow-heavy | 5 | Lantern Storm | 2.25 | 3.80 |
 | fast-weak vs slow-heavy | 6 | Rot Tide | 1.55 | >12 |
 | fast-weak vs slow-heavy | 7 | Shield Line | 4.30 | 4.10 |
-| fast-weak vs slow-heavy | 10 | The Gate Titan | 1.75 | 1.80 |
+| fast-weak vs slow-heavy | 10 | The Gate Titan | 1.40 | 1.45 |
 | armor-stack vs health-stack (equal 20-pt budget) | 4 | Grave March | 3.40 | 3.40 |
 | armor-stack vs health-stack (equal 20-pt budget) | 5 | Lantern Storm | 2.85 | 2.35 |
 | armor-stack vs health-stack (equal 20-pt budget) | 6 | Rot Tide | >12 | >12 |
 | armor-stack vs health-stack (equal 20-pt budget) | 7 | Shield Line | 8.15 | 8.15 |
 | armor-stack vs health-stack (equal 20-pt budget) | 8 | Restless Dead (offense-bottlenecked — informational only) | 2.85 | 2.85 |
-| armor-stack vs health-stack (equal 20-pt budget) | 10 | The Gate Titan | 2.25 | 2.25 |
+| armor-stack vs health-stack (equal 20-pt budget) | 10 | The Gate Titan | 2.05 | 2.05 |
 | spread vs focused | 4 | Grave March | 2.10 | 2.80 |
 | spread vs focused | 5 | Lantern Storm | 2.35 | 2.40 |
 | spread vs focused | 6 | Rot Tide | 1.55 | 2.65 |
 | spread vs focused | 7 | Shield Line | 3.50 | 4.65 |
-| spread vs focused | 10 | The Gate Titan | 1.45 | 1.70 |
+| spread vs focused | 10 | The Gate Titan | 1.55 | 1.35 |
+
+`spread vs focused` on The Gate Titan (level 10) is the boss inversion,
+corrected by the escort-size fix above: `focused` (1.35) now beats `spread`
+(1.55), matching the `boss` trait's design intent. It read 1.45/1.70
+(spread winning, backwards) with the first-pass escort.
 
 ### Comparison to Original
 
-All three targeted inversions from "Targets for the re-tune" now hold, and
-held already once the fixture correction landed in the "traits wired, not
-retuned" measurement — this task's job was closing the one remaining
-guardrail gap without undoing them:
+All three targeted inversions from "Targets for the re-tune" hold:
 
 - `slow-heavy < fast-weak` on Shield Line: Original 4.25 > 2.40 (backwards);
   now 4.10 < 4.30 — inverted and holds after re-tune.
 - `slow-heavy < fast-weak` on Grave March: Original 1.70 ≈ 1.65 (noise); now
   1.70 < 3.00 — a clear gap, not a coin flip.
 - `health-stack < armor-stack` on Lantern Storm: Original 2.80 > 2.55
-  (armor strictly better); now 2.35 < 2.85 — inverted, and the gap widened
-  from the "traits wired" measurement's 2.55/2.85 to 2.35/2.85 as the caster
-  retune above was tuned specifically to keep this discriminating.
+  (armor strictly better); now 2.35 < 2.85 — inverted, on numbers below the
+  original (see "Level 5 caster retune" above).
 - `spread < focused` on Rot Tide: already correct at 1.55 < 2.65 in the
   Original; now 1.55 < 2.65 — unchanged, regression guard holds.
 
@@ -419,37 +524,40 @@ Every level whose median rose above the Original, and why:
 - **Level 4 / 11 (Grave March, brute archetype, +9.7% / +4.9%):** stripping
   `heroDamageMultipliers` removed the old 1.18×/1.12× magic/summon discount,
   which raises required power for exactly the classes that discount used to
-  help (Arcanist, Summoner) — visible in the per-class matrix. This is the
-  intended effect: the discount was fake counterplay with no mechanical
-  basis, and removing it lets the real armored-counterplay mechanic (plating)
-  set the level's difficulty instead.
+  help (Arcanist, Summoner). The discount was fake counterplay with no
+  mechanical basis; removing it lets plating set the level's difficulty
+  instead.
 - **Level 5 / 12 (Lantern Storm, caster archetype, +9.5% / +4.8%):** the
-  caster retune (see "Deviation from the brief") intentionally keeps more
-  raw damage on this level than the brief's first-pass numbers, specifically
-  so the armor-pierce mechanic has enough magnitude to discriminate
-  `armor-stack` from `health-stack` at the harness's gear-factor resolution.
-  The median cost of that choice is a single-digit percentage, well inside
-  the +20% ceiling on both levels it touches.
+  caster curve (`1.35+0.03n`, below the original `1.45+0.035n`) is a genuine
+  cut, but `spellWisp.damage` staying at its original `9` means the level's
+  base threat didn't fall as far as the curve alone suggests. The median
+  cost is a single-digit percentage on both levels this archetype touches,
+  well inside the +20% ceiling, and buys the armor-pierce mechanic enough
+  magnitude to discriminate `armor-stack` from `health-stack` at the
+  harness's gear-factor resolution (see "Level 5 fragility" above for the
+  associated risk).
 - **Level 7 (Shield Line, +4.2%):** this is the guardrail that was failing
-  (median 3.40 against a 2.88 ceiling, i.e. +41.7%). Stripping the level's
-  `heroDamageMultipliers` and cutting `shieldBearer`/`glassCultist` stats
-  brought it back to 2.50 (+4.2%) — under the ceiling, and still reflects a
-  real (if modest) net increase from Original because plating is a
-  permanent, deliberate addition to this level's difficulty budget that the
-  Original baseline never had.
+  pre-task (median 3.40 against a 2.88 ceiling, +41.7%). Stripping the
+  level's `heroDamageMultipliers` and cutting `shieldBearer`/`glassCultist`
+  stats brought it back to 2.50 (+4.2%) — under the ceiling, and still
+  reflects a real (if modest) net increase from Original because plating is
+  a permanent, deliberate addition to this level's difficulty budget that
+  the Original baseline never had.
 - **Level 8 (Restless Dead, mixed archetype, +3.7%):** this archetype's
-  `heroDamageMultipliers` were already `{}` before this task, so nothing here
-  changed by hand. The rise is entirely the `graveBrute` waves in this
+  `heroDamageMultipliers` were already `{}` before this task, so nothing
+  here changed by hand. The rise is entirely the `graveBrute` waves in this
   level's mix picking up plating (a Tasks 1–5 addition, not present in the
   Original baseline at all) — partially offset, not fully, by cutting
   `graveBrute.armor` 9→6.
-- **Level 10 (The Gate Titan, boss level, +16.7%):** the boss escort added in
-  Step 4 (`rotImp` + `skeleton` waves) is new content that did not exist in
-  the Original baseline; `enemyHealthMultiplier`'s coefficient was cut
-  (`0.14` → `0.11`) to partially pay for it, but not fully, by design — the
-  escort's purpose is to give `spreadResistance` something to bite on, which
-  necessarily makes the fight busier. +16.7% is the largest rise of any
-  level but still inside the +20% ceiling.
+- **Level 9 (Broken Wings, +0%, no median change):** stripping this level's
+  `heroDamageMultipliers` (fix-round item 4) raised Arcanist and Ranger's
+  individual requirements, but not enough to move the median (still 1.70).
+- **Level 10 (The Gate Titan, boss level, +12.5%):** the boss escort
+  (`rotImp: 3`) is new content that did not exist in the Original baseline;
+  `enemyHealthMultiplier`'s coefficient rose slightly (`0.11` → `0.13` in the
+  fix round, net `0.14` → `0.13` vs. Original) to keep the fight's overall
+  pressure while the escort itself is small enough that `focused` still
+  beats `spread`. +12.5% is inside the +20% ceiling with room to spare.
 
 No level's median fell outside its ceiling, level 1 remains exactly 1.00 for
 every class, and the swarm regression guard (`spread < focused` on Rot Tide)
