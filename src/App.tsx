@@ -3,6 +3,7 @@ import { Coins, Play, RotateCcw, Save, Sparkles, Trophy, Zap } from "lucide-reac
 import { CombatReplay } from "./components/CombatReplay";
 import { heroClasses } from "./game/content";
 import { createBonusLevel, createCampaignLevel, shouldQueueBonusLevel } from "./game/levels";
+import { buildLevelRoster } from "./game/roster";
 import { applyEquipmentToHero, getActiveSetBonuses } from "./game/equipment";
 import { rollShopStock, getRerollCost } from "./game/shop";
 import { upgradeCost, rerollCost, canUpgrade } from "./game/upgrade";
@@ -69,6 +70,7 @@ export function App() {
   const experienceProgress =
     experienceForNextLevel > 0 ? Math.min(100, Math.round((campaign.experience / experienceForNextLevel) * 100)) : 100;
   const currentLevelCompleted = campaign.completedLevelIds.includes(currentLevel.id);
+  const levelRoster = useMemo(() => buildLevelRoster(currentLevel), [currentLevel]);
   const statBudget = getStatPointBudget(campaign.heroLevel);
   const pointsSpent = getAllocatedPointCount(campaign.statAllocation);
   const pointsRemaining = statBudget - pointsSpent;
@@ -266,6 +268,30 @@ export function App() {
               <span key={note}>{note}</span>
             ))}
           </div>
+
+          {levelRoster.length > 0 ? (
+            <div className="enemy-roster" aria-label="Enemy roster">
+              <p className="eyebrow">What you are facing</p>
+              {levelRoster.map((entry) => (
+                <div className="roster-entry" key={entry.enemyId}>
+                  <div className="roster-head">
+                    <strong>{entry.name}</strong>
+                    <span>×{entry.count}</span>
+                  </div>
+                  {entry.traits.length > 0 ? (
+                    <ul>
+                      {entry.traits.map((trait) => (
+                        <li key={trait.trait}>
+                          <span>{trait.label}</span>
+                          {trait.summary}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="talent-panel" aria-label="Talents">
             <div className="progress-row">
