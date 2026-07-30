@@ -1,4 +1,4 @@
-import type { EnemyTrait, TraitDescription, TraitRule } from "./types";
+import type { DamageKind, EnemyTrait, PackScaling, TraitDescription, TraitRule } from "./types";
 
 export const traitRules: Record<EnemyTrait, TraitRule> = {
   ground: {
@@ -79,4 +79,71 @@ export function hasTraitRule(trait: EnemyTrait): boolean {
 
 export function enemyPlating(traits: EnemyTrait[]): number {
   return traits.reduce((total, trait) => total + (traitRules[trait].plating ?? 0), 0);
+}
+
+export interface HeroDamageInput {
+  rawDamage: number;
+  traits: EnemyTrait[];
+  armor: number;
+  /** Level-scaled flat reduction, resolved once per spawn. */
+  plating: number;
+  damageKind: DamageKind;
+  critical: boolean;
+  /** How many enemies this same attack struck. */
+  targetsHit: number;
+  livingSwarmCount: number;
+}
+
+export interface ResolvedDamage {
+  damage: number;
+  appliedTraits: EnemyTrait[];
+}
+
+/** Armor curve shared by both damage directions. */
+export function mitigateByArmor(rawDamage: number, armor: number): number {
+  return rawDamage * (100 / (100 + Math.max(0, armor) * 6));
+}
+
+function packAllies(pack: PackScaling, livingSwarmCount: number): number {
+  return Math.min(pack.maxAllies, Math.max(0, livingSwarmCount - 1));
+}
+
+export function resolveHeroDamage(input: HeroDamageInput): ResolvedDamage {
+  const applied = new Set<EnemyTrait>();
+  let multiplier = 1;
+
+  for (const trait of input.traits) {
+    const rule = traitRules[trait];
+
+    if (rule.meleePenalty !== undefined && input.damageKind === "melee") {
+      multiplier *= rule.meleePenalty;
+      applied.add(trait);
+    }
+
+    if (rule.critVulnerability !== undefined && input.critical) {
+      multiplier *= rule.critVulnerability;
+      applied.add(trait);
+    }
+
+    if (rule.spreadResistance !== undefined && input.targetsHit > 1) {
+      multiplier *= rule.spreadResistance;
+      applied.add(trait);
+    }
+
+    if (rule.pack !== undefined) {
+      const allies = packAllies(rule.pack, input.livingSwarmCount);
+      if (allies > 0) {
+        multiplier *= Math.max(0.1, 1 - allies * rule.pack.resistancePerAlly);
+        applied.add(trait);
+      }
+    }
+
+    if (rule.plating !== undefined && input.plating > 0) {
+      applied.add(trait);
+    }
+  }
+
+  const mitigated = mitigateByArmor(input.rawDamage * multiplier, input.armor);
+
+  return { damage: Math.max(1, Math.round(mitigated - input.plating)), appliedTraits: [...applied] };
 }
