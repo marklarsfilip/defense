@@ -28,7 +28,7 @@ describe("simulateCombat", () => {
     expect(result.gold).toBe(90);
   });
 
-  it("lets melee heroes hit flying enemies with weaker fallback attacks", () => {
+  it("lets melee heroes hit flying enemies with weaker fallback attacks, less efficiently than ranged", () => {
     const flyingLevel = createCampaignLevel(2);
     const berserker = heroClasses.find((heroClass) => heroClass.id === "berserker")!;
     const ranger = heroClasses.find((heroClass) => heroClass.id === "ranger")!;
@@ -36,7 +36,14 @@ describe("simulateCombat", () => {
     const rangerResult = simulateCombat(ranger, flyingLevel);
 
     expect(meleeResult.enemiesDefeated).toBeGreaterThan(0);
-    expect(rangerResult.enemiesDefeated).toBeGreaterThan(meleeResult.enemiesDefeated);
+    // enemiesDefeated saturates once both classes clear the level (both end up at the
+    // wave's total enemy count), so it can no longer express a degree of advantage now
+    // that trait effects like fragile's crit vulnerability help melee close the gap.
+    // duration and health remaining don't saturate and together capture what "ranged
+    // handles flyers better" actually means: faster and safer. Do not swap this back to
+    // enemiesDefeated without re-checking whether both sides still hit the same ceiling.
+    expect(rangerResult.duration).toBeLessThan(meleeResult.duration);
+    expect(rangerResult.heroHealthRemaining).toBeGreaterThan(meleeResult.heroHealthRemaining);
   });
 });
 
