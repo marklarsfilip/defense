@@ -301,13 +301,17 @@ run traitBalance --reporter=verbose` and by `src/game/balance.ts`.
   caster damage, so caster damage should come down). See "Level 5 caster
   retune" below for why this number, not the brief's steeper `0.95+0.02n`
   cut, is the one that works.
-- `createBossLevel` gained an escort, then had it cut down: currently just
-  `rotImp: 3` alongside `gateTitan` (no `skeleton` wave).
-  `enemyHealthMultiplier`: `1 + levelNumber * 0.14` → `1 + levelNumber *
-  0.13`. See "Boss escort size" below — a much larger escort (6–9 `rotImp` +
-  4–6 `skeleton`, tried first) made spread strictly better than focused fire
-  on boss levels, which directly contradicts the `boss` trait's own
-  description (`"sustained single-target damage wins"`).
+- `createBossLevel` gained an escort, went through two more revisions:
+  currently `rotImp: 6, interval: 6` alongside `gateTitan` (no `skeleton`
+  wave). `enemyHealthMultiplier`: `1 + levelNumber * 0.14` → `1 + levelNumber
+  * 0.13`. See "Boss escort size" below — the first escort (6–9 `rotImp` +
+  4–6 `skeleton`) made spread strictly better than focused fire, contradicting
+  the `boss` trait's own description (`"sustained single-target damage
+  wins"`); the second (`rotImp: 3` in a clustered burst) fixed the inversion
+  but was mechanically inert — `spreadResistance` had nothing to act on,
+  since the imps were all dead early in the fight. Spacing 6 imps 6 seconds
+  apart keeps the escort alive across most of the fight, which is what makes
+  the trait actually load-bearing.
 - `notes` rewritten to flavour-only text on every archetype level (brute,
   shield, swarm, caster, glass, flying, boss). Four of the brief's exact
   strings (`"Heavy reward chest"` / `"High reward chest"` on brute, shield,
@@ -363,21 +367,51 @@ contradicts the `boss` trait's own summary in `traits.ts`
 (`"sustained single-target damage wins"`), which a lone boss honoured
 correctly (`focused 1.00 < spread 1.25`) before any escort existed.
 
-Swept escort sizes directly against `simulateCombat`, holding `gateTitan`
-fixed:
+A second-pass escort (`rotImp: 3`, no `skeleton`, spawned in a single
+clustered burst at `startsAt: 6, interval: 0.9`) fixed the inversion
+(`focused 1.35 < spread 1.55` at level 10) but turned out to be a **false
+fix**: disabling `spreadResistance` outright (setting the multiplier to `1`
+at runtime, not editing `traits.ts`) changed `requiredPower(spread, …)` by
+exactly zero at every level tested. Cause: with only 3 imps spawned in a
+tight burst starting at t=6, all three were dead well before the boss
+became vulnerable to a joint hit later in the fight — 2 of 17 spread casts
+ever struck more than one enemy, and the escort was gone by t≈13 in a
+65-second fight. `focused < spread` held for the same reason it holds for a
+*lone* boss (offense parity), not because of the trait. This is exactly the
+failure mode the `boss` trait exists to avoid, and it looked identical to a
+working fix from every guardrail's perspective — see "campaign balance >
+boss counterplay" below for the regression test this added.
 
-| escort | lvl 10: spread / focused | lvl 20: spread / focused |
-| --- | --- | --- |
-| `rotImp 6+n/5` + `skeleton 4+n/10` (first pass) | 1.45 / 1.70 (wrong) | 2.10 / 2.65 (wrong) |
-| `rotImp 3+n/10` + `skeleton 2+n/20` | 1.45 / 1.45 (tied) | 2.20 / 2.10 (wrong) |
-| `rotImp 4`, no skeleton | 1.35 / 1.40 (wrong, narrow) | 2.20 / 1.80 (right) |
-| **`rotImp 3`, no skeleton (chosen)** | **1.55 / 1.35 (right)** | **2.45 / 1.80 (right)** |
+Swept escort configurations directly against `simulateCombat`, checking not
+just the inversion but whether disabling `spreadResistance` actually moves
+the number:
 
-`rotImp: 3`, no `skeleton` wave, holds `focused < spread` at levels 10, 20,
-30, and 40 with comfortable margin (checked up to level 40 for robustness).
-`enemyHealthMultiplier`'s coefficient was raised slightly, `0.11` → `0.13`,
-to partially pay for the smaller escort's lighter pressure. Level 10's
-median lands at 1.35 (baseline 1.20, ceiling 1.44) — inside the cap.
+| escort | lvl 10: spread / focused | lvl 20: spread / focused | resistance live? |
+| --- | --- | --- | --- |
+| `rotImp 6+n/5` + `skeleton 4+n/10` (first pass) | 1.45 / 1.70 (wrong) | 2.10 / 2.65 (wrong) | — |
+| `rotImp 3`, clustered burst, no skeleton | 1.55 / 1.35 (right) | 2.45 / 1.80 (right) | **no** — inert |
+| **`rotImp 6`, `interval: 6` (chosen)** | **1.65 / 1.45 (right)** | **2.50 / 2.05 (right)** | **yes** |
+
+Spreading 6 imps 6 seconds apart keeps at least one alive across most of the
+65-second fight, overlapping with the boss for genuine multi-target casts.
+Confirmed directly: with `spreadResistance` at its real value (`0.6`),
+`requiredPower(spread, 10) = 1.65`; with it disabled (`1`, measured at
+runtime, `traits.ts` untouched), `requiredPower(spread, 10) = 1.55` — a real
+0.10 gap, not zero. Same at level 20: `2.50` (resistance on) vs `2.45`
+(resistance off). `enemyHealthMultiplier`'s coefficient stayed at `0.13`
+(raised from the original `0.11` in an earlier pass; no further change was
+needed here). `gateTitan.armor` is `18` (see below). Level 10's median
+lands at **1.40** against the **1.44** ceiling — inside the cap, but with
+little room; worst/median ratio is 1.18.
+
+A guardrail now pins both properties directly in
+`src/game/traitBalance.test.ts` (`describe("boss counterplay", ...)`): one
+asserts `focused < spread` on a boss level, and a second — the one that
+actually catches an inert escort — measures `spread`'s required power with
+`spreadResistance` enabled and disabled (toggled at runtime, restored in a
+`finally` block) and asserts the two differ. An inert escort, like the
+`rotImp: 3` clustered-burst configuration above, passes the first test and
+fails the second.
 
 ### Level 5 fragility (known, documented, not fixed)
 
@@ -407,8 +441,14 @@ identical to the mixed level's chest and nowhere near boss (`1.9`) or bonus
 (`2.8`) luck. What they actually have is an elevated `rewardMultiplier`
 (1.16–1.2, vs. baseline 1), which scales per-kill XP/gold, not chest luck.
 Replaced all four with `"Higher reward per kill"`, which is what's true.
-`createBossLevel`'s `"Higher reward chest"` is accurate as written (its
-chest luck multiplier really is 1.9) and was left alone.
+
+`createBossLevel`'s original note, `"Higher reward chest"`, is also
+accurate (its chest luck multiplier really is 1.9, unlike the four
+archetypes above) — but an earlier pass of this task changed it to
+`"Higher reward per kill"` anyway, apparently by over-applying the same
+find-and-replace as the four genuine fixes. That dropped the one chest
+claim in the whole file that was actually true. Restored `createBossLevel`'s
+note to `"Higher reward chest"`.
 
 ### Glass retune verification (level 17)
 
@@ -428,7 +468,7 @@ improvement:
 
 | lvl | 13 | 14 | 15 | 16 | **17** | 18 | 19 | 20 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| median | 3.40 | 4.20 | 2.80 | 2.90 | **2.95** | 4.40 | 5.35 | 2.15 |
+| median | 3.40 | 4.20 | 2.80 | 2.90 | **2.95** | 4.40 | 5.35 | 1.90 |
 
 Before the retune, level 17 (5.80) was a difficulty spike well above its
 neighbours (15: 2.80, 16: 2.90, 18: 4.40) — closer to level 19's 5.35 than to
@@ -452,7 +492,8 @@ than trivializing or overtuning the level — no correction needed.
 - PASS `campaign balance > does not inflate difficulty: median power stays within 20% of the baseline`.
 - PASS `campaign balance > leaves every class able to kill something on every early level`.
 
-Full repo suite: `npm test` — 146/146 passed. `npm run build` — clean.
+Full repo suite: `npm test` — 148/148 passed (12 in `traitBalance.test.ts`,
+including the two new boss-counterplay tests). `npm run build` — clean.
 
 ### Full class matrix (required power per class per level)
 
@@ -467,17 +508,19 @@ Full repo suite: `npm test` — 146/146 passed. `npm run build` — clean.
 | 7 | Shield Line | 1.90 | 2.45 | 2.50 | 2.95 | 4.25 | 2.50 |
 | 8 | Restless Dead | 1.15 | 1.40 | 1.30 | 1.55 | 1.85 | 1.40 |
 | 9 | Broken Wings | 1.70 | 1.10 | 1.45 | 2.40 | 2.40 | 1.70 |
-| 10 | The Gate Titan | 1.05 | 1.35 | 1.10 | 1.60 | 1.50 | 1.35 |
+| 10 | The Gate Titan | 1.00 | 1.40 | 1.10 | 1.65 | 1.60 | 1.40 |
 | 11 | Grave March | 2.70 | 3.20 | 3.05 | 3.95 | 4.75 | 3.20 |
 | 12 | Lantern Storm | 2.55 | 4.25 | 4.00 | 1.75 | 3.30 | 3.30 |
 
-Levels 9 and 10 shifted slightly from the pre-fix-round table: level 9
-(Broken Wings) because stripping its `heroDamageMultipliers` (item 4) removed
-the ranged/magic/summon discount, raising Arcanist (1.00→1.10) and Ranger
-(1.20→1.45) modestly; level 10 (boss) because of the smaller escort and
-adjusted health coefficient (item 2). Neither change affects that level's
-guardrail-relevant median vs. baseline (level 9: 1.70, unchanged; level 10:
-1.35, up from a pre-fix-round 1.40, still inside the 1.44 cap).
+Levels 9 and 10 shifted from the pre-fix-round table: level 9 (Broken Wings)
+because stripping its `heroDamageMultipliers` (item 4) removed the
+ranged/magic/summon discount, raising Arcanist (1.00→1.10) and Ranger
+(1.20→1.45) modestly; level 10 (boss) because the escort was rebuilt twice —
+first shrunk to `rotImp: 3`, then rebuilt as `rotImp: 6, interval: 6` once
+that was found to be mechanically inert (see "Boss escort size" below).
+Level 9's median is unchanged from baseline (1.70). Level 10's median is
+**1.40** against a **1.44** ceiling — passing, but the tightest margin of
+any level in this table (worst/median ratio 1.18).
 
 ### Required power per build shape
 
@@ -487,23 +530,26 @@ guardrail-relevant median vs. baseline (level 9: 1.70, unchanged; level 10:
 | fast-weak vs slow-heavy | 5 | Lantern Storm | 2.25 | 3.80 |
 | fast-weak vs slow-heavy | 6 | Rot Tide | 1.55 | >12 |
 | fast-weak vs slow-heavy | 7 | Shield Line | 4.30 | 4.10 |
-| fast-weak vs slow-heavy | 10 | The Gate Titan | 1.40 | 1.45 |
+| fast-weak vs slow-heavy | 10 | The Gate Titan | 1.55 | 1.55 |
 | armor-stack vs health-stack (equal 20-pt budget) | 4 | Grave March | 3.40 | 3.40 |
 | armor-stack vs health-stack (equal 20-pt budget) | 5 | Lantern Storm | 2.85 | 2.35 |
 | armor-stack vs health-stack (equal 20-pt budget) | 6 | Rot Tide | >12 | >12 |
 | armor-stack vs health-stack (equal 20-pt budget) | 7 | Shield Line | 8.15 | 8.15 |
 | armor-stack vs health-stack (equal 20-pt budget) | 8 | Restless Dead (offense-bottlenecked — informational only) | 2.85 | 2.85 |
-| armor-stack vs health-stack (equal 20-pt budget) | 10 | The Gate Titan | 2.05 | 2.05 |
+| armor-stack vs health-stack (equal 20-pt budget) | 10 | The Gate Titan | 2.15 | 2.15 |
 | spread vs focused | 4 | Grave March | 2.10 | 2.80 |
 | spread vs focused | 5 | Lantern Storm | 2.35 | 2.40 |
 | spread vs focused | 6 | Rot Tide | 1.55 | 2.65 |
 | spread vs focused | 7 | Shield Line | 3.50 | 4.65 |
-| spread vs focused | 10 | The Gate Titan | 1.55 | 1.35 |
+| spread vs focused | 10 | The Gate Titan | 1.65 | 1.45 |
 
-`spread vs focused` on The Gate Titan (level 10) is the boss inversion,
-corrected by the escort-size fix above: `focused` (1.35) now beats `spread`
-(1.55), matching the `boss` trait's design intent. It read 1.45/1.70
-(spread winning, backwards) with the first-pass escort.
+`spread vs focused` on The Gate Titan (level 10) is the boss inversion:
+`focused` (1.45) beats `spread` (1.65), matching the `boss` trait's design
+intent, and — unlike the intermediate `rotImp: 3` escort, which produced the
+same inversion (1.55/1.35) for the wrong reason — this is now confirmed
+mechanically live (see "Boss escort size" below): disabling
+`spreadResistance` at runtime moves `spread`'s required power from 1.65 down
+to 1.55, a real change, not zero.
 
 ### Comparison to Original
 
@@ -518,6 +564,12 @@ All three targeted inversions from "Targets for the re-tune" hold:
   original (see "Level 5 caster retune" above).
 - `spread < focused` on Rot Tide: already correct at 1.55 < 2.65 in the
   Original; now 1.55 < 2.65 — unchanged, regression guard holds.
+- `focused < spread` on The Gate Titan (boss levels): the Original had no
+  escort to test against (a lone boss trivially honours this — nothing for
+  `spreadResistance` to act on). With the final escort (`rotImp: 6,
+  interval: 6`), `focused` (1.45) < `spread` (1.65), and — the property that
+  actually matters here — the gap is confirmed mechanically live, not a
+  coincidence of offense parity (see "Boss escort size" below).
 
 Every level whose median rose above the Original, and why:
 
@@ -552,12 +604,19 @@ Every level whose median rose above the Original, and why:
 - **Level 9 (Broken Wings, +0%, no median change):** stripping this level's
   `heroDamageMultipliers` (fix-round item 4) raised Arcanist and Ranger's
   individual requirements, but not enough to move the median (still 1.70).
-- **Level 10 (The Gate Titan, boss level, +12.5%):** the boss escort
-  (`rotImp: 3`) is new content that did not exist in the Original baseline;
-  `enemyHealthMultiplier`'s coefficient rose slightly (`0.11` → `0.13` in the
-  fix round, net `0.14` → `0.13` vs. Original) to keep the fight's overall
-  pressure while the escort itself is small enough that `focused` still
-  beats `spread`. +12.5% is inside the +20% ceiling with room to spare.
+- **Level 10 (The Gate Titan, boss level, +16.7%):** the boss escort
+  (`rotImp: 6, interval: 6`) is new content that did not exist in the
+  Original baseline, and is now confirmed to be mechanically load-bearing
+  (see "Boss escort size" below) rather than decorative. Its size was set by
+  what `spreadResistance` needs to have something to act on across most of
+  the fight, not by a difficulty target — `enemyHealthMultiplier`'s
+  coefficient (`0.14` → `0.13` net vs. Original) was the only lever pulled
+  to keep the median inside the ceiling. +16.7% is the largest rise of any
+  level in this table, landing at median 1.40 against the 1.44 ceiling —
+  inside the cap, but the tightest margin here. If this level's difficulty
+  needs to come down later, `enemyHealthMultiplier` is the lever to pull
+  first; shrinking the escort risks reintroducing the inert-escort bug this
+  fix round exists to prevent.
 
 No level's median fell outside its ceiling, level 1 remains exactly 1.00 for
 every class, and the swarm regression guard (`spread < focused` on Rot Tide)

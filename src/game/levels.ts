@@ -132,10 +132,10 @@ function createBossLevel(levelNumber: number): LevelDefinition {
       rewardMultiplier: 1.9,
       heroDamageMultipliers: {},
     },
-    notes: ["Every tenth level", "Boss with a light escort", "Higher reward per kill"],
+    notes: ["Every tenth level", "Boss with a light escort", "Higher reward chest"],
     enemyWaves: [
       { enemyId: "gateTitan", count: 1, startsAt: 0.8, interval: 1, gate: "north" },
-      { enemyId: "rotImp", count: 3, startsAt: 6, interval: 0.9, gate: "east" },
+      { enemyId: "rotImp", count: 6, startsAt: 6, interval: 6, gate: "east" },
     ],
   };
 }

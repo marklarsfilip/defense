@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { STAT_POINT_INCREMENTS } from "./allocation";
 import { heroClasses } from "./content";
 import { medianPower, requiredPower, requiredPowerByClass } from "./balance";
+import { traitRules } from "./traits";
 import type { HeroClass, Stats } from "./types";
 
 const BRUTE_LEVEL = 4;
 const CASTER_LEVEL = 5;
 const SWARM_LEVEL = 6;
 const SHIELD_LEVEL = 7;
+const BOSS_LEVEL = 10;
 
 /** Measured on untouched code at commit 70ff484. See the baseline document. */
 const BASELINE_MEDIAN: Record<number, number> = {
@@ -134,6 +136,41 @@ describe("swarm counterplay", () => {
 
   it("spends an equal per-cast damage budget on both ability fixtures", () => {
     expect(abilityDamageBudget(SPREAD)).toBe(abilityDamageBudget(FOCUSED));
+  });
+});
+
+describe("boss counterplay", () => {
+  it("keeps focused fire ahead of spread on a boss level, matching the boss trait's design", () => {
+    // traits.ts: "sustained single-target damage wins". A lone boss honours
+    // this trivially (nothing for spreadResistance to act on). The escort in
+    // levels.ts exists so this holds for a *reason* — see the liveness test
+    // below, which is the one that actually catches an inert escort.
+    expect(power(FOCUSED, BOSS_LEVEL)).toBeLessThan(power(SPREAD, BOSS_LEVEL));
+  });
+
+  // Regression guard for a real bug: an escort that is too small, too
+  // clustered, or too short-lived to still be alive when the boss is also
+  // targetable makes `spreadResistance` structurally inert — multi-target
+  // casts never actually land on more than one enemy, so `focused < spread`
+  // above would hold for the wrong reason (offense parity with a lone boss,
+  // not the trait). That happened during Task 7's fix rounds and looked
+  // identical to a working escort from the outside: same inversion, same
+  // guardrail passing. Pin liveness directly by disabling spreadResistance
+  // at runtime (not by editing traits.ts) and asserting SPREAD's required
+  // power actually depends on it — if the escort is inert, disabling the
+  // trait changes nothing and this fails.
+  it("keeps spreadResistance mechanically live on a boss level, not just structurally present", () => {
+    const withResistance = power(SPREAD, BOSS_LEVEL);
+    const originalResistance = traitRules.boss.spreadResistance;
+    traitRules.boss.spreadResistance = 1; // disable: multiplier of 1 = no reduction
+    let withoutResistance: number;
+    try {
+      withoutResistance = power(SPREAD, BOSS_LEVEL);
+    } finally {
+      traitRules.boss.spreadResistance = originalResistance;
+    }
+
+    expect(withoutResistance).toBeLessThan(withResistance);
   });
 });
 
