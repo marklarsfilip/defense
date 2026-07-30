@@ -296,9 +296,14 @@ What holds: the *mechanism* moved. All 11 `heroDamageMultipliers` producers in
 `levels.ts` now pass `{}` — none of the class-keyed counterplay described in
 Problem remains — and that move buys a real build-shape axis on the offensive
 and ability dimensions. Level 4 (Grave March) separates fast-weak (3.00
-required power) from slow-heavy (1.70); level 6 (Rot Tide) separates spread
-(1.55) from focused (2.65). Neither gap existed at a shared budget before
-trait teeth landed.
+required power) from slow-heavy (1.70); that gap did not exist at a shared
+budget before trait teeth landed (Original: 1.65 vs 1.70, noise).
+
+Level 6 (Rot Tide) is not evidence of a new gap, even though it also shows
+spread (1.55) ahead of focused (2.65): that gap already existed, unchanged, in
+the Original table (1.55 vs 2.65). Pack scaling did not measurably widen it.
+The guardrail on this pair is a regression guard for a property that was
+already correct, not proof that this slice created it.
 
 What does not hold: class identity did not recede as build shape rose — it
 remains the dominant predictor of required power, and per-level class spread

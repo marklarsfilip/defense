@@ -34,12 +34,6 @@ describe("trait rules table", () => {
     }
   });
 
-  it("gives every rule-bearing trait a combat-log line", () => {
-    for (const trait of ALL_TRAITS.filter(hasTraitRule)) {
-      expect(traitRules[trait].logLine, trait).toBeTruthy();
-    }
-  });
-
   it("sums plating across a trait list", () => {
     expect(enemyPlating(["ground", "armored"])).toBe(9);
     expect(enemyPlating(["ground", "flying"])).toBe(0);

@@ -64,9 +64,10 @@ export function describeEnemyTraits(traits: EnemyTrait[]): TraitDescription[] {
 }
 
 // `logLine` is present on a trait rule if and only if the rule has at least one
-// mechanical knob (see traits.test.ts: "gives every rule-bearing trait a
-// combat-log line"), so it doubles as the "has a rule" marker without a second,
-// hand-maintained list of knob names that could silently drift from the table.
+// mechanical knob (see traits.test.ts: "marks ground and bonus as rule-free and
+// everything else as rule-bearing"), so it doubles as the "has a rule" marker
+// without a second, hand-maintained list of knob names that could silently
+// drift from the table.
 export function hasTraitRule(trait: EnemyTrait): boolean {
   return traitRules[trait].logLine !== undefined;
 }
